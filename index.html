@@ -549,6 +549,34 @@ async function fetchPrice(ticker){
   }
 }
 
+  async function refreshAll(){
+  const dot = document.getElementById('dot');
+  const stxt = document.getElementById('status-txt');
+  dot.className = 'dot loading';
+  stxt.textContent = 'Aggiornamento quotazioni in corso…';
+
+  const tickers = [...new Set(portfolio.filter(p => p.ticker && p.ticker.trim()).map(p => p.ticker.trim()))];
+  let ok = 0;
+
+  for(const t of tickers){
+    const p = await fetchPrice(t);
+    if(p !== null){
+      prices[t] = p;
+      ok++;
+    }
+  }
+
+  const now = new Date().toLocaleString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+  
+  if(ok > 0){
+    dot.className = 'dot live';
+    stxt.textContent = `Aggiornato: ${now} — ${ok}/${tickers.length} quotazioni ricevute`;
+  } else {
+    dot.className = 'dot err';
+    stxt.textContent = 'Errore: nessuna quotazione ricevuta. Controlla la connessione.';
+  }
+  render();
+}
 // ==================== CALCOLI ====================
 function getLivePrice(inv){return(inv.ticker&&prices[inv.ticker])||null;}
 
