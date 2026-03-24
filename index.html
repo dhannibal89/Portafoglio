@@ -418,40 +418,63 @@ function loadDefaults(){
 // ==================== PREZZI ====================
 
 
-async function fetchPrice(ticker){
-  if(!ticker||!ticker.trim())return null;
-  try{
-    const proxy = "https://api.allorigins.win/get?url=";
-    const target = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.trim())}?interval=1d&range=1d`;
-    const r = await fetch(proxy + encodeURIComponent(target));
-    if(!r.ok) return null;
-    const responseData = await r.json();
-    const d = JSON.parse(responseData.contents);
-    const meta = d?.chart?.result?.[0]?.meta;
-    if(!meta) return null;
-    return meta.regularMarketPrice || meta.previousClose || null;
-  }catch(e){
-    console.error("Errore fetch:", e);
-    return null;
+async function fetchPrice(ticker) {
+  if (!ticker || !ticker.trim()) return null;
+  const proxy = "https://api.allorigins.win/get?url=";
+  const target = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.trim())}?interval=1d&range=1d`;
+  
+  // Proviamo fino a 2 volte se fallisce
+  for (let i = 0; i < 2; i++) {
+    try {
+      const r = await fetch(proxy + encodeURIComponent(target) + "&cacheBuster=" + Date.now());
+      if (!r.ok) throw new Error("Errore di rete");
+      const responseData = await r.json();
+      const d = JSON.parse(responseData.contents);
+      const meta = d?.chart?.result?.[0]?.meta;
+      const price = meta?.regularMarketPrice || meta?.previousClose || null;
+      
+      if (price) return price; // Se abbiamo il prezzo, lo restituiamo subito
+    } catch (e) {
+      console.warn(`Tentativo ${i+1} fallito per ${ticker}`);
+      // Aspetta 1 secondo prima di riprovare
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
   }
+  return null;
 }
 
-  async function refreshAll(){
+async function refreshAll() {
   const dot = document.getElementById('dot');
   const stxt = document.getElementById('status-txt');
   dot.className = 'dot loading';
-  stxt.textContent = 'Aggiornamento quotazioni in corso…';
-
+  stxt.textContent = 'Aggiornamento quotazioni in corso...';
+  
   const tickers = [...new Set(portfolio.filter(p => p.ticker && p.ticker.trim()).map(p => p.ticker.trim()))];
   let ok = 0;
 
-  for(const t of tickers){
+  for (const t of tickers) {
     const p = await fetchPrice(t);
-    if(p !== null){
+    if (p !== null) {
       prices[t] = p;
       ok++;
     }
+    // PAUSA DI SICUREZZA: Aspettiamo 600ms tra una richiesta e l'altra
+    await new Promise(resolve => setTimeout(resolve, 600));
+    
+    // Aggiorna il testo mentre carica per farti vedere che lavora
+    stxt.textContent = `Caricamento: ${ok}/${tickers.length} completati...`;
   }
+
+  const now = new Date().toLocaleString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+  if (ok > 0) {
+    dot.className = 'dot live';
+    stxt.textContent = `Ultimo aggiornamento: ${now} — Recuperati ${ok} su ${tickers.length}`;
+  } else {
+    dot.className = 'dot err';
+    stxt.textContent = 'Errore: riprova tra un minuto.';
+  }
+  render();
+}
 
   const now = new Date().toLocaleString('it-IT', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
   
