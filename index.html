@@ -402,128 +402,14 @@ function load(){
 function loadDefaults(){
   if(portfolio.length>0)return;
   portfolio=[
-    // ---- AMMINISTRATO - ETF ----
-    {
-      id:1,
-      name:'iShares Core S&P 500 UCITS ETF Acc',
-      shortName:'S&P 500 (iShares)',
-      isin:'IE00B5BMR087',
-      ticker:'CSSPX.MI',
-      type:'ETF Azionario',
-      cat:'etf',
-      invested:42964.85,   // giacenza media × quote = 42964.85 (da report)
-      shares:80,           // quote: 80.000
-      buyPrice:537.06,     // giacenza media
-      curRef:48810.40,     // controvalore fine periodo 23/03/2026
-      date:'2025-10-14',
-      pac:0
-    },
-    {
-      id:2,
-      name:'Vanguard FTSE All-World UCITS ETF Acc',
-      shortName:'All-World (Vanguard)',
-      isin:'IE00BK5BQT80',
-      ticker:'VWCE.MI',
-      type:'ETF Azionario',
-      cat:'etf',
-      invested:33113.72,
-      shares:280,
-      buyPrice:118.26,
-      curRef:40252.80,
-      date:'2025-10-14',
-      pac:0
-    },
-    {
-      id:3,
-      name:'iShares € Govt Bond 3-7yr UCITS ETF Acc',
-      shortName:'Govt Bond 3-7yr (iShares)',
-      isin:'IE00B3VTMU14',
-      ticker:'IBGX.MI',
-      type:'ETF Obbligazionario',
-      cat:'etf',
-      invested:17323.46,   // giacenza media
-      shares:150,
-      buyPrice:115.49,
-      curRef:19912.50,
-      date:'2025-10-14',
-      pac:0
-    },
-    {
-      id:4,
-      name:'Vanguard LifeStrategy 80% Equity UCITS ETF Acc',
-      shortName:'LifeStrategy 80% (Vanguard)',
-      isin:'IE00BMV95R75',
-      ticker:'VNGA80.MI',
-      type:'ETF Bilanciato',
-      cat:'etf',
-      invested:14757.30,
-      shares:380,
-      buyPrice:38.84,
-      curRef:14797.20,
-      date:'2025-11-27',
-      pac:0
-    },
-    {
-      id:5,
-      name:'Amundi EUR High Yield Corporate Bond ESG UCITS ETF Acc',
-      shortName:'EUR High Yield (Amundi)',
-      isin:'LU2346257210',
-      ticker:'HYC.MI',
-      type:'ETF Obbligazionario',
-      cat:'etf',
-      invested:10163.04,
-      shares:930,
-      buyPrice:10.93,
-      curRef:10060.74,
-      date:'2025-11-27',
-      pac:0
-    },
-    {
-      id:6,
-      name:'Amundi MSCI Emerging Markets UCITS ETF Acc',
-      shortName:'Emerging Markets (Amundi)',
-      isin:'LU1681045370',
-      ticker:'AEEM.MI',
-      type:'ETF Azionario',
-      cat:'etf',
-      invested:4000.47,
-      shares:662,
-      buyPrice:6.04,
-      curRef:4271.89,
-      date:'2025-12-05',
-      pac:0
-    },
-    // ---- GESTITO - FONDI CON PAC ----
-    {
-      id:7,
-      name:'DWS Invest Artificial Intelligence LC',
-      shortName:'Artificial Intelligence (DWS)',
-      isin:'LU1863263346',
-      ticker:'0P0001ESJI',
-      type:'Fondo Azionario',
-      cat:'fondo',
-      invested:1327.17,
-      shares:10.406,
-      buyPrice:127.54,   // giacenza media
-      curRef:2599.31,
-      date:'2025-02-21',
-      pac:200
-    },
-    {
-      id:8,
-      name:'DWS Invest ESG Equity Income LC',
-      shortName:'ESG Equity Income (DWS)',
-      isin:'LU1616932866',
-      ticker:'0P0001BHHS',
-      type:'Fondo Azionario',
-      cat:'fondo',
-      invested:1327.17,
-      shares:14.406,
-      buyPrice:92.13,   // giacenza media
-      curRef:2686.29,
-      date:'2025-02-21',
-      pac:200
-    },
+    { id:1, name:'iShares Core S&P 500', isin:'IE00B5BMR087', ticker:'CSSPX.MI', type:'ETF Azionario', cat:'etf', invested:49814.00, shares:80, buyPrice:622.67, curRef:48810.40, date:'2025-10-14', pac:0 },
+    { id:2, name:'Vanguard FTSE All-World', isin:'IE00BK5BQT80', ticker:'VWCE.MI', type:'ETF Azionario', cat:'etf', invested:39978.75, shares:280, buyPrice:142.78, curRef:40252.80, date:'2025-10-14', pac:0 },
+    { id:3, name:'iShares € Govt Bond 3-7yr', isin:'IE00B3VTML14', ticker:'IBGX.MI', type:'ETF Obbligazionario', cat:'etf', invested:20091.75, shares:150, buyPrice:133.94, curRef:19912.50, date:'2025-10-14', pac:0 },
+    { id:4, name:'Vanguard LifeStrategy 80%', isin:'IE00BMVB5R75', ticker:'VNGA80.MI', type:'ETF Bilanciato', cat:'etf', invested:14757.30, shares:380, buyPrice:38.83, curRef:14797.20, date:'2025-11-27', pac:0 },
+    { id:5, name:'Amundi EUR High Yield ESG', isin:'LU2346257210', ticker:'HYC.MI', type:'ETF Obbligazionario', cat:'etf', invested:10163.04, shares:930, buyPrice:10.92, curRef:10060.74, date:'2025-11-27', pac:0 },
+    { id:6, name:'Amundi MSCI Emerging Markets', isin:'LU1681045370', ticker:'AEEM.MI', type:'ETF Azionario', cat:'etf', invested:4000.47, shares:662, buyPrice:6.04, curRef:4271.89, date:'2025-12-05', pac:0 },
+    { id:7, name:'DWS Artificial Intelligence', isin:'LU1863263346', ticker:'0P0001ESJI', type:'Fondo Azionario', cat:'fondo', invested:2583.50, shares:10.406, buyPrice:248.27, curRef:2599.31, date:'2025-02-21', pac:200 },
+    { id:8, name:'DWS ESG Equity Income', isin:'LU1616932866', ticker:'0P0001BHHS', type:'Fondo Azionario', cat:'fondo', invested:2583.50, shares:14.406, buyPrice:179.33, curRef:2686.29, date:'2025-02-21', pac:200 }
   ];
   liquidita=42.80;
   save();
@@ -533,18 +419,19 @@ function loadDefaults(){
 
 
 async function fetchPrice(ticker){
-  if(!ticker||!ticker.trim()) return null;
-  const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ticker.trim())}`;
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
+  if(!ticker||!ticker.trim())return null;
   try{
-    const r = await fetch(proxyUrl);
+    const proxy = "https://api.allorigins.win/get?url=";
+    const target = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.trim())}?interval=1d&range=1d`;
+    const r = await fetch(proxy + encodeURIComponent(target));
     if(!r.ok) return null;
-    const d = await r.json();
-    const quote = d?.quoteResponse?.result?.[0];
-    if(!quote) return null;
-    return quote.regularMarketPrice || quote.previousClose || null;
+    const responseData = await r.json();
+    const d = JSON.parse(responseData.contents);
+    const meta = d?.chart?.result?.[0]?.meta;
+    if(!meta) return null;
+    return meta.regularMarketPrice || meta.previousClose || null;
   }catch(e){
-    console.error('Errore fetch', ticker, e);
+    console.error("Errore fetch:", e);
     return null;
   }
 }
