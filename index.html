@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Portafoglio Daniel & Micol</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --bg: #f5f4f0;
+  --surface: #ffffff;
+  --surface2: #eeede8;
+  --surface3: #e6e4de;
+  --border: rgba(0,0,0,0.09);
+  --border2: rgba(0,0,0,0.16);
+  --text: #18180f;
+  --text2: #6a6a60;
+  --text3: #9e9e94;
+  --green: #1a9268;
+  --green-bg: #e6f5ee;
+  --green-txt: #116644;
+  --red: #cc5228;
+  --red-bg: #faede7;
+  --red-txt: #8f3018;
+  --amber-bg: #fef3dc;
+  --amber-txt: #7a4a08;
+  --blue: #2d7dd2;
+  --blue-bg: #e8f2fb;
+  --blue-txt: #154f90;
+  --purple-bg: #f0eeff;
+  --purple-txt: #4a3bbf;
+  --r: 12px;
+  --r-sm: 7px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141410;
+    --surface: #1e1e1a;
+    --surface2: #28281f;
+    --surface3: #323228;
+    --border: rgba(255,255,255,0.09);
+    --border2: rgba(255,255,255,0.16);
+    --text: #eeede8;
+    --text2: #9a9a8e;
+    --text3: #666660;
+    --green-bg: #0a2a1e;
+    --green-txt: #6fcca0;
+    --red-bg: #2e1208;
+    --red-txt: #f09878;
+    --amber-bg: #2a1a04;
+    --amber-txt: #f0b84a;
+    --blue-bg: #091d38;
+    --blue-txt: #78aee8;
+    --purple-bg: #160f40;
+    --purple-txt: #a08ef0;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;}
+a{color:var(--blue-txt);}
+
+/* LAYOUT */
+.app{max-width:980px;margin:0 auto;padding:1.25rem 1rem 4rem;}
+
+/* TOP BAR */
+.topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:1.5rem;flex-wrap:wrap;}
+.topbar-left h1{font-size:22px;font-weight:700;letter-spacing:-0.5px;}
+.topbar-left .sub{font-size:12px;color:var(--text2);margin-top:3px;display:flex;align-items:center;gap:6px;}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--text3);}
+.dot.live{background:var(--green);}
+.dot.loading{background:var(--amber-txt);animation:pulse 1s infinite;}
+.dot.err{background:var(--red);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+/* METRICS */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:1.25rem;}
+.m-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:14px 16px;}
+.m-lbl{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px;}
+.m-val{font-size:21px;font-weight:700;letter-spacing:-.4px;line-height:1.1;}
+.m-sub{font-size:12px;color:var(--text2);margin-top:3px;}
+.pos{color:var(--green);}
+.neg{color:var(--red);}
+
+/* CARD */
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);margin-bottom:1rem;overflow:hidden;}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:.5px solid var(--border);cursor:pointer;user-select:none;}
+.card-head h2{font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;}
+.card-head .badge-count{font-size:11px;font-weight:600;background:var(--surface2);padding:2px 7px;border-radius:20px;color:var(--text2);}
+.card-body{padding:16px;}
+.card-body.hidden{display:none;}
+.card-body.no-pad{padding:0;}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{background:var(--surface2);padding:9px 13px;text-align:left;font-weight:700;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;position:sticky;top:0;}
+tbody tr{border-top:.5px solid var(--border);}
+tbody tr:hover{background:var(--surface2);}
+td{padding:11px 13px;vertical-align:middle;}
+.name-col{min-width:200px;max-width:240px;}
+.fund-name{font-size:13px;font-weight:600;line-height:1.3;margin-bottom:2px;}
+.fund-meta{font-size:11px;color:var(--text3);font-family:'SF Mono',monospace;}
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;margin-top:3px;}
+.tag-etf{background:var(--blue-bg);color:var(--blue-txt);}
+.tag-fondo{background:var(--purple-bg);color:var(--purple-txt);}
+.tag-obbl{background:var(--amber-bg);color:var(--amber-txt);}
+.tag-liq{background:var(--surface2);color:var(--text2);}
+.tag-pac{background:#fff3e0;color:#e65100;font-size:9px;}
+@media(prefers-color-scheme:dark){.tag-pac{background:#2a1400;color:#ffab40;}}
+.pill{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;border-radius:5px;white-space:nowrap;}
+.pill-pos{background:var(--green-bg);color:var(--green-txt);}
+.pill-neg{background:var(--red-bg);color:var(--red-txt);}
+.pill-neu{background:var(--surface2);color:var(--text2);}
+.price-live{font-size:13px;font-weight:600;}
+.price-ref{font-size:11px;color:var(--text3);}
+.nd{color:var(--text3);font-style:italic;font-size:12px;}
+.pct-bar{height:4px;border-radius:2px;background:var(--surface2);margin-top:4px;overflow:hidden;}
+.pct-fill{height:100%;border-radius:2px;background:var(--blue);}
+
+/* CHARTS */
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+@media(max-width:600px){.chart-row{grid-template-columns:1fr;}}
+.chart-block h3{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;}
+.chart-box{position:relative;width:100%;height:230px;}
+.legend{margin-top:10px;display:flex;flex-direction:column;gap:4px;}
+.leg-item{display:flex;align-items:center;justify-content:space-between;font-size:12px;gap:8px;}
+.leg-label{display:flex;align-items:center;gap:6px;color:var(--text2);flex:1;min-width:0;}
+.leg-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0;}
+.leg-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.leg-val{font-weight:700;color:var(--text);white-space:nowrap;}
+
+/* PAC */
+.pac-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px;}
+.pac-card{background:var(--surface2);border-radius:var(--r-sm);padding:13px 15px;}
+.pac-card-title{font-size:13px;font-weight:700;margin-bottom:8px;}
+.pac-row{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-top:4px;}
+.pac-row span:last-child{font-weight:600;color:var(--text);}
+.pac-total-bar{background:var(--blue-bg);border-radius:var(--r-sm);padding:11px 15px;display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--blue-txt);font-weight:700;}
+
+/* FORMS */
+.tabs{display:flex;gap:2px;background:var(--surface2);border-radius:var(--r-sm);padding:3px;margin-bottom:14px;}
+.tab{flex:1;padding:7px 4px;font-size:12px;font-weight:600;text-align:center;border-radius:5px;cursor:pointer;color:var(--text2);transition:all .15s;}
+.tab.active{background:var(--surface);color:var(--text);}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:12px;}
+.fgrp label{display:block;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;}
+.fgrp input,.fgrp select,.fgrp textarea{width:100%;background:var(--surface2);border:.5px solid var(--border2);border-radius:var(--r-sm);padding:9px 11px;font-size:13px;color:var(--text);outline:none;transition:border-color .15s;font-family:inherit;}
+.fgrp input:focus,.fgrp select:focus,.fgrp textarea:focus{border-color:var(--blue);box-shadow:0 0 0 2px rgba(45,125,210,.15);}
+.fgrp select option{background:var(--surface);}
+.btn{border:none;border-radius:var(--r-sm);padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;transition:opacity .15s,transform .1s;font-family:inherit;}
+.btn:active{transform:scale(.98);}
+.btn-primary{background:var(--text);color:var(--surface);}
+.btn-primary:hover{opacity:.82;}
+.btn-sm{padding:6px 12px;font-size:12px;}
+.btn-del{background:transparent;color:var(--red);border:.5px solid var(--red);padding:4px 9px;font-size:12px;border-radius:5px;cursor:pointer;}
+.btn-refresh{background:var(--surface2);border:.5px solid var(--border2);color:var(--text);padding:9px 16px;font-size:13px;font-weight:700;border-radius:var(--r-sm);cursor:pointer;}
+.hint{font-size:11px;color:var(--text3);margin-top:8px;line-height:1.5;}
+.form-msg{font-size:12px;color:var(--green-txt);margin-left:10px;}
+.form-msg.e{color:var(--red-txt);}
+hr{border:none;border-top:.5px solid var(--border);margin:14px 0;}
+
+/* NOTIF */
+.notif{position:fixed;bottom:20px;right:20px;background:var(--text);color:var(--surface);padding:10px 16px;border-radius:var(--r-sm);font-size:13px;font-weight:600;z-index:9999;opacity:0;transition:opacity .3s;pointer-events:none;}
+.notif.show{opacity:1;}
+
+/* MOBILE */
+@media(max-width:580px){
+  .app{padding:1rem .75rem 4rem;}
+  .topbar-left h1{font-size:18px;}
+  .m-val{font-size:18px;}
+  .metrics{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Portafoglio Daniel &amp; Micol</h1>
+    <div class="sub">
+      <span class="dot" id="dot"></span>
+      <span id="status-txt">Premi "Aggiorna prezzi" per caricare le quotazioni live</span>
+    </div>
+  </div>
+  <button class="btn btn-refresh" onclick="refreshAll()">↻ Aggiorna prezzi</button>
+</div>
+
+<!-- METRICHE -->
+<div class="metrics">
+  <div class="m-card"><div class="m-lbl">Valore attuale</div><div class="m-val" id="m-cur">€ —</div><div class="m-sub" id="m-date">—</div></div>
+  <div class="m-card"><div class="m-lbl">Capitale versato</div><div class="m-val" id="m-inv">€ —</div><div class="m-sub">Versamenti totali</div></div>
+  <div class="m-card"><div class="m-lbl">Guadagno / Perdita</div><div class="m-val" id="m-pnl">€ —</div><div class="m-sub" id="m-pct">—</div></div>
+  <div class="m-card"><div class="m-lbl">PAC mensile attivo</div><div class="m-val">€ 400</div><div class="m-sub" id="m-pac-sub">—</div></div>
+</div>
+
+<!-- GRAFICI -->
+<div class="card">
+  <div class="card-head" onclick="tog('charts')"><h2>Grafici portafoglio</h2><span id="tgl-charts">▾</span></div>
+  <div class="card-body" id="bd-charts">
+    <div class="chart-row">
+      <div class="chart-block">
+        <h3>Composizione per valore attuale</h3>
+        <div class="chart-box"><canvas id="pieC"></canvas></div>
+        <div class="legend" id="pie-leg"></div>
+      </div>
+      <div class="chart-block">
+        <h3>Performance per strumento (%)</h3>
+        <div class="chart-box" id="bar-wrap" style="height:280px;"><canvas id="barC"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TABELLA -->
+<div class="card">
+  <div class="card-head" onclick="tog('tbl')"><h2>Tutti gli investimenti <span class="badge-count" id="cnt">—</span></h2><span id="tgl-tbl">▾</span></div>
+  <div class="card-body no-pad" id="bd-tbl">
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Strumento</th>
+            <th>Tipo</th>
+            <th>Quote</th>
+            <th>Capitale inv. €</th>
+            <th>Valore att. €</th>
+            <th>Prezzo att.</th>
+            <th>P.medio acq.</th>
+            <th>+/- €</th>
+            <th>+/- %</th>
+            <th>Apertura</th>
+            <th>% portaf.</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PAC -->
+<div class="card">
+  <div class="card-head" onclick="tog('pac')"><h2>Piano di Accumulo — PAC € 400/mese</h2><span id="tgl-pac">▾</span></div>
+  <div class="card-body" id="bd-pac">
+    <div class="pac-grid" id="pac-cards"></div>
+    <div class="pac-total-bar" id="pac-total"></div>
+    <hr>
+    <div style="font-size:13px;font-weight:700;margin-bottom:10px;">Registra versamento PAC</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
+      <div class="fgrp"><label>Strumento</label><select id="pac-sel" style="width:220px;"></select></div>
+      <div class="fgrp"><label>Importo €</label><input type="number" id="pac-amt" value="200" style="width:110px;"/></div>
+      <div class="fgrp"><label>Quote aggiunte</label><input type="number" id="pac-shares" placeholder="es. 0.76" step="0.0001" style="width:120px;"/></div>
+      <div class="fgrp"><label>Prezzo eseguito €</label><input type="number" id="pac-price" placeholder="es. 248.00" step="0.01" style="width:120px;"/></div>
+      <div class="fgrp"><label>&nbsp;</label><button class="btn btn-primary btn-sm" onclick="addPac()">Registra</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- AGGIUNGI -->
+<div class="card">
+  <div class="card-head" onclick="tog('add')"><h2>Aggiungi / Modifica investimento</h2><span id="tgl-add">▾</span></div>
+  <div class="card-body" id="bd-add">
+    <div class="tabs">
+      <div class="tab active" id="tab-etf" onclick="switchTab('etf')">ETF quotato</div>
+      <div class="tab" id="tab-fondo" onclick="switchTab('fondo')">Fondo (NAV)</div>
+      <div class="tab" id="tab-btp" onclick="switchTab('btp')">BTP / Obbligazione</div>
+      <div class="tab" id="tab-cert" onclick="switchTab('cert')">Certificato</div>
+    </div>
+
+    <!-- ETF -->
+    <div id="frm-etf">
+      <div class="form-grid">
+        <div class="fgrp"><label>Nome per esteso</label><input id="e-name" placeholder="iShares Core S&amp;P 500 UCITS ETF"/></div>
+        <div class="fgrp"><label>ISIN</label><input id="e-isin" placeholder="IE00B5BMR087"/></div>
+        <div class="fgrp"><label>Ticker Yahoo Finance</label><input id="e-ticker" placeholder="CSSPX.MI"/></div>
+        <div class="fgrp"><label>Tipo</label>
+          <select id="e-type">
+            <option>ETF Azionario</option><option>ETF Obbligazionario</option>
+            <option>ETF Bilanciato</option><option>ETF Alternativo</option>
+          </select>
+        </div>
+        <div class="fgrp"><label>Capitale versato €</label><input type="number" id="e-inv" placeholder="42964.85" step="0.01"/></div>
+        <div class="fgrp"><label>Quote possedute</label><input type="number" id="e-shares" placeholder="80" step="0.0001"/></div>
+        <div class="fgrp"><label>Prezzo medio acquisto €</label><input type="number" id="e-buy" placeholder="537.06" step="0.01"/></div>
+        <div class="fgrp"><label>Data apertura</label><input type="date" id="e-date"/></div>
+        <div class="fgrp"><label>PAC mensile €</label><input type="number" id="e-pac" value="0"/></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="addInv('etf')">Salva ETF</button>
+        <span id="e-msg" class="form-msg"></span>
+      </div>
+      <p class="hint">Ticker Borsa Italiana → aggiungi <strong>.MI</strong> (es. CSSPX.MI, VWCE.MI). Cerca su <a href="https://finance.yahoo.com" target="_blank">Yahoo Finance ↗</a></p>
+    </div>
+
+    <!-- FONDO -->
+    <div id="frm-fondo" style="display:none;">
+      <div class="form-grid">
+        <div class="fgrp"><label>Nome per esteso</label><input id="f-name" placeholder="DWS Invest Artificial Intelligence LC"/></div>
+        <div class="fgrp"><label>ISIN</label><input id="f-isin" placeholder="LU1863263346"/></div>
+        <div class="fgrp"><label>Codice Yahoo Finance (NAV)</label><input id="f-ticker" placeholder="0P0001ESJI"/></div>
+        <div class="fgrp"><label>Capitale versato €</label><input type="number" id="f-inv" placeholder="1327.17" step="0.01"/></div>
+        <div class="fgrp"><label>Quote possedute</label><input type="number" id="f-shares" placeholder="10.406" step="0.0001"/></div>
+        <div class="fgrp"><label>NAV medio acquisto €</label><input type="number" id="f-buy" placeholder="127.54" step="0.01"/></div>
+        <div class="fgrp"><label>Data apertura</label><input type="date" id="f-date"/></div>
+        <div class="fgrp"><label>PAC mensile €</label><input type="number" id="f-pac" value="0"/></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="addInv('fondo')">Salva Fondo</button>
+        <span id="f-msg" class="form-msg"></span>
+      </div>
+      <p class="hint">I fondi DWS si aggiornano con il NAV giornaliero (pubblicato il giorno dopo). Il codice Yahoo tipo <strong>0P0001XXXX</strong> si trova cercando l'ISIN su Yahoo Finance.</p>
+    </div>
+
+    <!-- BTP -->
+    <div id="frm-btp" style="display:none;">
+      <div class="form-grid">
+        <div class="fgrp"><label>Descrizione</label><input id="b-name" placeholder="BTP 5 anni scad. 2030"/></div>
+        <div class="fgrp"><label>ISIN</label><input id="b-isin" placeholder="IT0005xxxxxx"/></div>
+        <div class="fgrp"><label>Ticker Yahoo (opz.)</label><input id="b-ticker" placeholder="Lascia vuoto se N/D"/></div>
+        <div class="fgrp"><label>Capitale versato €</label><input type="number" id="b-inv" placeholder="10000" step="0.01"/></div>
+        <div class="fgrp"><label>Valore nominale €</label><input type="number" id="b-nom" placeholder="10000" step="0.01"/></div>
+        <div class="fgrp"><label>Cedola annua %</label><input type="number" id="b-coupon" placeholder="3.50" step="0.01"/></div>
+        <div class="fgrp"><label>Prezzo acquisto (% noz.)</label><input type="number" id="b-price" placeholder="98.50" step="0.01"/></div>
+        <div class="fgrp"><label>Data acquisto</label><input type="date" id="b-date"/></div>
+        <div class="fgrp"><label>Data scadenza</label><input type="date" id="b-mat"/></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-primary" onclick="addInv('btp')">Salva BTP</button>
+        <span id="b-msg" class="form-msg"></span>
+      </div>
+    </div>
+
+    <!-- CERT -->
+    <div id="frm-cert" style="display:none;">
+      <div class="form-grid">
+        <div class="fgrp"><label>Descrizione</label><input id="c-name" placeholder="Certificato Phoenix su FTSE MIB"/></div>
+        <div class="fgrp"><label>ISIN</label><input id="c-isin" placeholder="XS0000000000"/></div>
+        <div class="fgrp"><label>Ticker Yahoo (opz.)</label><input id="c-ticker" placeholder="Opzionale"/></div>
+        <div class="fgrp"><label>Capitale versato €</label><input type="number" id="c-inv" placeholder="5000" step="0.01"/></div>
+        <div class="fgrp"><label>Valore attuale €</label><input type="number" id="c-cur" placeholder="5200" step="0.01"/></div>
+        <div class="fgrp"><label>Cedola periodica %</label><input type="number" id="c-coupon" placeholder="1.20" step="0.01"/></div>
+        <div class="fgrp"><label>Frequenza cedola</label>
+          <select id="c-freq"><option>Mensile</option><option>Trimestrale</option><option>Semestrale</option><option>Annuale</option></select>
+        </div>
+        <div class="fgrp"><label>Data acquisto</label><input type="date" id="c-date"/></div>
+        <div class="fgrp"><label>Data scadenza</label><input type="date" id="c-mat"/></div>
+        <div class="fgrp"><label>Barriera % (se presente)</label><input type="number" id="c-bar" placeholder="60" step="1"/></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="btn btn-primary" onclick="addInv('cert')">Salva Certificato</button>
+        <span id="c-msg" class="form-msg"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NOTE -->
+<div class="card">
+  <div class="card-head" onclick="tog('note')"><h2>Liquidità &amp; Note</h2><span id="tgl-note">▾</span></div>
+  <div class="card-body" id="bd-note">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+      <div class="fgrp"><label>Liquidità / Conto Welcome €</label><input type="number" id="liq-val" placeholder="42.80" step="0.01" style="width:160px;"/></div>
+      <button class="btn btn-primary btn-sm" onclick="saveLiq()">Salva</button>
+    </div>
+    <div class="fgrp">
+      <label>Note personali / obiettivi</label>
+      <textarea id="note-txt" rows="3" style="width:100%;resize:vertical;" placeholder="Prossima riunione col consulente, obiettivi, promemoria..."></textarea>
+    </div>
+    <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="saveNote()">Salva note</button>
+  </div>
+</div>
+
+</div>
+<div class="notif" id="notif"></div>
+
+<script>
+// ==================== COLORI ====================
+const COLORS=['#2d7dd2','#1a9268','#cc5228','#7060d8','#b87010','#c04878','#448820','#d04040','#20a0a0','#888880','#5090e0','#40b878'];
+
+// ==================== STATO ====================
+let portfolio=[];
+let prices={};
+let liquidita=0;
+let note='';
+
+// ==================== STORAGE ====================
+function save(){
+  try{localStorage.setItem('pf_dm_v1',JSON.stringify({portfolio,liquidita,note}));}catch(e){}
+}
+function load(){
+  try{
+    const d=localStorage.getItem('pf_dm_v1');
+    if(d){const o=JSON.parse(d);portfolio=o.portfolio||[];liquidita=o.liquidita||0;note=o.note||'';}
+  }catch(e){portfolio=[];}
+}
+
+// ==================== DATI INIZIALI DAL REPORT ZURICH ====================
+// Dati estratti dal Report Storico Zurich Bank del 24/03/2026
+// Giacenza media = prezzo medio ponderato acquisto
+// Quote reali dalla colonna "Quantità"
+function loadDefaults(){
+  if(portfolio.length>0)return;
+  portfolio=[
+    // ---- AMMINISTRATO - ETF ----
+    {
+      id:1,
+      name:'iShares Core S&P 500 UCITS ETF Acc',
+      shortName:'S&P 500 (iShares)',
+      isin:'IE00B5BMR087',
+      ticker:'CSSPX.MI',
+      type:'ETF Azionario',
+      cat:'etf',
+      invested:42964.85,   // giacenza media × quote = 42964.85 (da report)
+      shares:80,           // quote: 80.000
+      buyPrice:537.06,     // giacenza media
+      curRef:49814.00,     // controvalore fine periodo 23/03/2026
+      date:'2025-10-14',
+      pac:0
+    },
+    {
+      id:2,
+      name:'Vanguard FTSE All-World UCITS ETF Acc',
+      shortName:'All-World (Vanguard)',
+      isin:'IE00BK5BQT80',
+      ticker:'VWCE.MI',
+      type:'ETF Azionario',
+      cat:'etf',
+      invested:33113.72,
+      shares:280,
+      buyPrice:118.26,
+      curRef:40252.80,
+      date:'2025-10-14',
+      pac:0
+    },
+    {
+      id:3,
+      name:'iShares € Govt Bond 3-7yr UCITS ETF Acc',
+      shortName:'Govt Bond 3-7yr (iShares)',
+      isin:'IE00B3VTMU14',
+      ticker:'IBGX.MI',
+      type:'ETF Obbligazionario',
+      cat:'etf',
+      invested:17323.46,   // giacenza media
+      shares:150,
+      buyPrice:115.49,
+      curRef:19912.50,
+      date:'2025-10-14',
+      pac:0
+    },
+    {
+      id:4,
+      name:'Vanguard LifeStrategy 80% Equity UCITS ETF Acc',
+      shortName:'LifeStrategy 80% (Vanguard)',
+      isin:'IE00BMV95R75',
+      ticker:'VNGA80.MI',
+      type:'ETF Bilanciato',
+      cat:'etf',
+      invested:14757.30,
+      shares:380,
+      buyPrice:38.84,
+      curRef:14797.20,
+      date:'2025-11-27',
+      pac:0
+    },
+    {
+      id:5,
+      name:'Amundi EUR High Yield Corporate Bond ESG UCITS ETF Acc',
+      shortName:'EUR High Yield (Amundi)',
+      isin:'LU2346257210',
+      ticker:'HYC.MI',
+      type:'ETF Obbligazionario',
+      cat:'etf',
+      invested:10163.04,
+      shares:930,
+      buyPrice:10.93,
+      curRef:10060.74,
+      date:'2025-11-27',
+      pac:0
+    },
+    {
+      id:6,
+      name:'Amundi MSCI Emerging Markets UCITS ETF Acc',
+      shortName:'Emerging Markets (Amundi)',
+      isin:'LU1681045370',
+      ticker:'AEEM.MI',
+      type:'ETF Azionario',
+      cat:'etf',
+      invested:4000.47,
+      shares:662,
+      buyPrice:6.04,
+      curRef:4271.89,
+      date:'2025-12-05',
+      pac:0
+    },
+    // ---- GESTITO - FONDI CON PAC ----
+    {
+      id:7,
+      name:'DWS Invest Artificial Intelligence LC',
+      shortName:'Artificial Intelligence (DWS)',
+      isin:'LU1863263346',
+      ticker:'0P0001ESJI',
+      type:'Fondo Azionario',
+      cat:'fondo',
+      invested:1327.17,
+      shares:10.406,
+      buyPrice:127.54,   // giacenza media
+      curRef:2599.31,
+      date:'2025-02-21',
+      pac:200
+    },
+    {
+      id:8,
+      name:'DWS Invest ESG Equity Income LC',
+      shortName:'ESG Equity Income (DWS)',
+      isin:'LU1616932866',
+      ticker:'0P0001BHHS',
+      type:'Fondo Azionario',
+      cat:'fondo',
+      invested:1327.17,
+      shares:14.406,
+      buyPrice:92.13,   // giacenza media
+      curRef:2686.29,
+      date:'2025-02-21',
+      pac:200
+    },
+  ];
+  liquidita=42.80;
+  save();
+}
+
+// ==================== PREZZI ====================
+async function fetchPrice(ticker){
+  if(!ticker||!ticker.trim())return null;
+  try{
+    const r=await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.trim())}?interval=1d&range=1d`);
+    if(!r.ok)return null;
+    const d=await r.json();
+    const meta=d?.chart?.result?.[0]?.meta;
+    if(!meta)return null;
+    return meta.regularMarketPrice||meta.previousClose||null;
+  }catch(e){return null;}
+}
+
+async function refreshAll(){
+  const dot=document.getElementById('dot');
+  const stxt=document.getElementById('status-txt');
+  dot.className='dot loading';
+  stxt.textContent='Aggiornamento quotazioni in corso…';
+  const tickers=[...new Set(portfolio.filter(p=>p.ticker&&p.ticker.trim()).map(p=>p.ticker.trim()))];
+  let ok=0;
+  for(const t of tickers){
+    const p=await fetchPrice(t);
+    if(p!==null){prices[t]=p;ok++;}
+  }
+  const now=new Date().toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  if(ok>0){dot.className='dot live';stxt.textContent=`Aggiornato: ${now} — ${ok}/${tickers.length} quotazioni ricevute`;}
+  else{dot.className='dot err';stxt.textContent='Errore: nessuna quotazione ricevuta. Controlla la connessione.';}
+  render();
+}
+
+// ==================== CALCOLI ====================
+function getLivePrice(inv){return(inv.ticker&&prices[inv.ticker])||null;}
+
+function getCurVal(inv){
+  const p=getLivePrice(inv);
+  if(p!==null&&inv.shares)return p*inv.shares;
+  return inv.curRef||null;
+}
+
+// ==================== RENDER ====================
+function render(){
+  renderMetrics();
+  renderTable();
+  renderCharts();
+  renderPac();
+  document.getElementById('liq-val').value=liquidita||'';
+  document.getElementById('note-txt').value=note||'';
+  document.getElementById('cnt').textContent=portfolio.length;
+}
+
+function f(n,d=2){
+  if(n===null||n===undefined||isNaN(n))return'—';
+  return new Intl.NumberFormat('it-IT',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);
+}
+function fe(n){return n!==null&&!isNaN(n)?'€ '+f(n):'—';}
+
+function renderMetrics(){
+  let totCur=0,totInv=0,hasCur=false,hasInv=false;
+  for(const inv of portfolio){
+    const c=getCurVal(inv);
+    if(c!==null){totCur+=c;hasCur=true;}
+    if(inv.invested){totInv+=inv.invested;hasInv=true;}
+  }
+  totCur+=liquidita;
+  document.getElementById('m-cur').textContent=hasCur?fe(totCur):'€ —';
+  document.getElementById('m-inv').textContent=hasInv?fe(totInv):'€ —';
+  const pnlEl=document.getElementById('m-pnl');
+  const pctEl=document.getElementById('m-pct');
+  if(hasCur&&hasInv){
+    const pnl=totCur-totInv;
+    const pct=totInv>0?(pnl/totInv*100):0;
+    pnlEl.textContent=(pnl>=0?'+':'')+fe(Math.abs(pnl))*(pnl<0?-1:1);
+    pnlEl.textContent=(pnl>=0?'+€ ':'-€ ')+f(Math.abs(pnl));
+    pnlEl.className='m-val '+(pnl>=0?'pos':'neg');
+    pctEl.textContent=(pct>=0?'+':'')+f(pct)+'%';
+    pctEl.className='m-sub '+(pct>=0?'pos':'neg');
+  }
+  document.getElementById('m-date').textContent=new Date().toLocaleDateString('it-IT',{weekday:'short',day:'2-digit',month:'long',year:'numeric'});
+  // PAC sub
+  const pacInvs=portfolio.filter(p=>p.pac>0&&p.date);
+  const totVersato=pacInvs.reduce((s,inv)=>{
+    const start=new Date(inv.date);const now=new Date();
+    const months=Math.max(0,(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth()));
+    return s+(inv.pac||0)*months;
+  },0);
+  document.getElementById('m-pac-sub').textContent='Versato stimato: '+fe(totVersato);
+}
+
+function renderTable(){
+  const tbody=document.getElementById('tbl-body');
+  let totCur=portfolio.reduce((s,inv)=>{const c=getCurVal(inv);return s+(c||0);},0)+liquidita;
+  if(portfolio.length===0){tbody.innerHTML='<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text3);">Nessun investimento. Usa il form "Aggiungi" per inserirne uno.</td></tr>';return;}
+  let rows='';
+  for(let i=0;i<portfolio.length;i++){
+    const inv=portfolio[i];
+    const cur=getCurVal(inv);
+    const lp=getLivePrice(inv);
+    const pnl=(cur!==null&&inv.invested!==null&&inv.invested!==undefined)?cur-inv.invested:null;
+    const pct=(pnl!==null&&inv.invested)?pnl/inv.invested*100:null;
+    const pp=totCur>0&&cur!==null?cur/totCur*100:null;
+    let tagHtml='';
+    if(inv.cat==='etf'){if(inv.type.includes('Obblig'))tagHtml='<span class="tag tag-obbl">ETF Obbl.</span>';else if(inv.type.includes('Bilanc'))tagHtml='<span class="tag tag-obbl">ETF Bilanc.</span>';else tagHtml='<span class="tag tag-etf">ETF Azion.</span>';}
+    else if(inv.cat==='fondo')tagHtml='<span class="tag tag-fondo">Fondo</span>';
+    else if(inv.cat==='btp')tagHtml='<span class="tag tag-obbl">BTP/Obbl.</span>';
+    else if(inv.cat==='cert')tagHtml='<span class="tag tag-obbl">Certificato</span>';
+    const pnlCls=pnl===null?'pill-neu':pnl>=0?'pill-pos':'pill-neg';
+    const pnlSign=pnl!==null?(pnl>=0?'+€ ':'-€ '):'';
+    const pctSign=pct!==null?(pct>=0?'+':''):'';
+    let matInfo='';
+    if((inv.cat==='btp'||inv.cat==='cert')&&inv.maturity){
+      const days=Math.round((new Date(inv.maturity)-new Date())/(86400000));
+      matInfo=`<div style="font-size:10px;color:var(--text3);margin-top:2px;">Scad. ${new Date(inv.maturity).toLocaleDateString('it-IT')} (${days>0?days+'gg':'SCADUTO'})</div>`;}
+    const pacTag=inv.pac>0?`<span class="tag tag-pac">PAC €${inv.pac}/m</span>`:'';
+    rows+=`<tr>
+      <td class="name-col">
+        <div class="fund-name">${inv.shortName||inv.name}</div>
+        <div class="fund-meta">${inv.isin||''}</div>
+        ${tagHtml} ${pacTag} ${matInfo}
+      </td>
+      <td style="white-space:nowrap;font-size:12px;color:var(--text2);">${inv.type||inv.cat}</td>
+      <td style="font-size:13px;">${inv.shares?f(inv.shares,inv.shares%1===0?0:4):'—'}</td>
+      <td>${inv.invested!==null&&inv.invested!==undefined?fe(inv.invested):'<span class="nd">Non inserito</span>'}</td>
+      <td><strong>${cur!==null?fe(cur):'—'}</strong></td>
+      <td>
+        <div class="price-live">${lp!==null?'€ '+f(lp,inv.shares&&inv.shares<100?4:2):'<span class="nd">N/D</span>'}</div>
+        ${inv.cat==='fondo'?'<div class="price-ref">NAV giorn.</div>':''}
+      </td>
+      <td style="font-size:12px;color:var(--text2);">${inv.buyPrice?'€ '+f(inv.buyPrice,inv.buyPrice<50?4:2):'—'}</td>
+      <td><span class="pill ${pnlCls}">${pnl!==null?pnlSign+f(Math.abs(pnl)):'—'}</span></td>
+      <td><span class="pill ${pnlCls}">${pct!==null?pctSign+f(pct)+'%':'—'}</span></td>
+      <td style="font-size:12px;white-space:nowrap;color:var(--text2);">${inv.date?new Date(inv.date).toLocaleDateString('it-IT'):'—'}</td>
+      <td>
+        ${pp!==null?`<div style="font-size:12px;font-weight:700;">${f(pp,1)}%</div><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(pp,100)}%;"></div></div>`:'—'}
+      </td>
+      <td><button class="btn-del" onclick="delInv(${i})">✕</button></td>
+    </tr>`;
+  }
+  // Liquidità
+  if(liquidita>0){
+    const pp=totCur>0?liquidita/totCur*100:0;
+    rows+=`<tr style="opacity:.55;">
+      <td class="name-col"><div class="fund-name">Zurich Bank Conto Welcome</div><span class="tag tag-liq">Liquidità</span></td>
+      <td style="font-size:12px;color:var(--text2);">Liquidità</td>
+      <td>—</td><td>—</td>
+      <td><strong>${fe(liquidita)}</strong></td>
+      <td>—</td><td>—</td><td>—</td><td>—</td><td>—</td>
+      <td><div style="font-size:12px;font-weight:700;">${f(pp,1)}%</div><div class="pct-bar"><div class="pct-fill" style="width:${Math.min(pp,100)}%;"></div></div></td>
+      <td></td>
+    </tr>`;
+  }
+  tbody.innerHTML=rows;
+}
+
+let pieInst=null,barInst=null;
+function renderCharts(){
+  const labels=portfolio.map(inv=>inv.shortName||inv.name.substring(0,20));
+  const vals=portfolio.map(inv=>getCurVal(inv)||0);
+  const totCur=vals.reduce((a,b)=>a+b,0)+liquidita;
+  const pieVals=[...vals];const pieLabels=[...labels];
+  if(liquidita>0){pieVals.push(liquidita);pieLabels.push('Liquidità');}
+  const pieCtx=document.getElementById('pieC').getContext('2d');
+  if(pieInst){pieInst.destroy();pieInst=null;}
+  if(pieVals.some(v=>v>0)){
+    pieInst=new Chart(pieCtx,{
+      type:'doughnut',
+      data:{labels:pieLabels,datasets:[{data:pieVals,backgroundColor:COLORS.slice(0,pieVals.length),borderWidth:2,borderColor:'transparent'}]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fe(c.raw)} (${f(c.raw/totCur*100,1)}%)`}}},cutout:'56%'}
+    });
+  }
+  const leg=document.getElementById('pie-leg');
+  leg.innerHTML=pieLabels.map((l,i)=>`<div class="leg-item"><div class="leg-label"><span class="leg-dot" style="background:${COLORS[i]};"></span><span class="leg-name" title="${l}">${l}</span></div><div class="leg-val">${fe(pieVals[i])}</div></div>`).join('');
+  // Bar chart
+  const barData=portfolio.filter(inv=>inv.invested&&getCurVal(inv)).map(inv=>({
+    label:inv.shortName||inv.name.substring(0,18),
+    val:((getCurVal(inv)-inv.invested)/inv.invested*100)
+  }));
+  const wrap=document.getElementById('bar-wrap');
+  wrap.style.height=Math.max(220,barData.length*42+60)+'px';
+  const barCtx=document.getElementById('barC').getContext('2d');
+  if(barInst){barInst.destroy();barInst=null;}
+  if(barData.length>0){
+    barInst=new Chart(barCtx,{
+      type:'bar',
+      data:{labels:barData.map(d=>d.label),datasets:[{data:barData.map(d=>d.val),backgroundColor:barData.map(d=>d.val>=0?'#1a9268':'#cc5228'),borderRadius:4}]},
+      options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw>=0?'+':''}${f(c.raw)}%`}}},
+        scales:{x:{grid:{color:'rgba(128,128,128,.1)'},ticks:{callback:v=>v+'%',color:'#888',font:{size:11}}},y:{grid:{display:false},ticks:{color:'#888',font:{size:11}}}}}
+    });
+  }
+}
+
+function renderPac(){
+  const pacInvs=portfolio.filter(p=>p.pac>0);
+  const sel=document.getElementById('pac-sel');
+  sel.innerHTML=pacInvs.map((inv,_)=>`<option value="${portfolio.indexOf(inv)}">${inv.shortName||inv.name.substring(0,35)} — €${inv.pac}/m</option>`).join('');
+  let html='';
+  for(const inv of pacInvs){
+    const start=new Date(inv.date);const now=new Date();
+    const months=Math.max(0,(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth()));
+    const versato=(inv.pac||0)*months;
+    html+=`<div class="pac-card">
+      <div class="pac-card-title">${inv.shortName||inv.name.substring(0,30)}</div>
+      <div class="pac-row"><span>ISIN</span><span style="font-family:monospace;font-size:11px;">${inv.isin}</span></div>
+      <div class="pac-row"><span>PAC mensile</span><span>${fe(inv.pac)}</span></div>
+      <div class="pac-row"><span>Dal</span><span>${new Date(inv.date).toLocaleDateString('it-IT')}</span></div>
+      <div class="pac-row"><span>Mesi trascorsi</span><span>${months}</span></div>
+      <div class="pac-row"><span>Versato stimato</span><span>${fe(versato)}</span></div>
+      <div class="pac-row"><span>Valore attuale</span><span>${fe(getCurVal(inv))}</span></div>
+    </div>`;
+  }
+  document.getElementById('pac-cards').innerHTML=html||'<div style="color:var(--text3);font-size:13px;">Nessun PAC attivo.</div>';
+  const totPac=pacInvs.reduce((s,p)=>s+(p.pac||0),0);
+  const totVersato=pacInvs.reduce((s,inv)=>{
+    const start=new Date(inv.date);const now=new Date();
+    const months=Math.max(0,(now.getFullYear()-start.getFullYear())*12+(now.getMonth()-start.getMonth()));
+    return s+(inv.pac||0)*months;
+  },0);
+  document.getElementById('pac-total').innerHTML=`<span>Totale PAC mensile: <strong>${fe(totPac)}</strong></span><span>Versato totale stimato: <strong>${fe(totVersato)}</strong></span>`;
+}
+
+// ==================== AZIONI ====================
+function tog(id){
+  const b=document.getElementById('bd-'+id);
+  const t=document.getElementById('tgl-'+id);
+  const h=b.classList.toggle('hidden');
+  t.textContent=h?'▸':'▾';
+}
+function switchTab(tab){
+  ['etf','fondo','btp','cert'].forEach(t=>{
+    document.getElementById('tab-'+t).className='tab'+(t===tab?' active':'');
+    document.getElementById('frm-'+t).style.display=t===tab?'':'none';
+  });
+}
+function delInv(i){
+  if(!confirm('Rimuovere "'+( portfolio[i].shortName||portfolio[i].name)+'"?'))return;
+  portfolio.splice(i,1);save();render();notif('Investimento rimosso.');
+}
+function addPac(){
+  const idx=parseInt(document.getElementById('pac-sel').value);
+  const amt=parseFloat(document.getElementById('pac-amt').value);
+  const sh=parseFloat(document.getElementById('pac-shares').value);
+  const pr=parseFloat(document.getElementById('pac-price').value);
+  if(isNaN(idx)||isNaN(amt)){notif('Inserisci almeno importo.',true);return;}
+  if(portfolio[idx]){
+    if(portfolio[idx].invested!==null&&portfolio[idx].invested!==undefined)portfolio[idx].invested+=amt;
+    if(!isNaN(sh)&&sh>0){
+      const prevSh=portfolio[idx].shares||0;
+      const prevPr=portfolio[idx].buyPrice||pr;
+      portfolio[idx].shares=prevSh+sh;
+      if(!isNaN(pr)&&pr>0)portfolio[idx].buyPrice=(prevPr*prevSh+pr*sh)/portfolio[idx].shares;
+    }
+    save();render();
+    document.getElementById('pac-shares').value='';
+    document.getElementById('pac-price').value='';
+    notif('Versamento PAC registrato: +'+fe(amt));
+  }
+}
+function addInv(tab){
+  let inv={id:Date.now()};
+  if(tab==='etf'){
+    const nm=document.getElementById('e-name').value.trim();
+    const tk=document.getElementById('e-ticker').value.trim().toUpperCase();
+    if(!nm||!tk){showMsg('e-msg','Inserisci nome e ticker.',true);return;}
+    inv={...inv,name:nm,shortName:nm,isin:document.getElementById('e-isin').value.trim(),ticker:tk,type:document.getElementById('e-type').value,cat:'etf',
+      invested:parseFloat(document.getElementById('e-inv').value)||null,
+      shares:parseFloat(document.getElementById('e-shares').value)||null,
+      buyPrice:parseFloat(document.getElementById('e-buy').value)||null,
+      curRef:null,date:document.getElementById('e-date').value,pac:parseFloat(document.getElementById('e-pac').value)||0};
+    ['e-name','e-isin','e-ticker','e-inv','e-shares','e-buy','e-pac'].forEach(id=>{document.getElementById(id).value='';});
+    showMsg('e-msg','Salvato!');
+  } else if(tab==='fondo'){
+    const nm=document.getElementById('f-name').value.trim();
+    if(!nm){showMsg('f-msg','Inserisci il nome.',true);return;}
+    inv={...inv,name:nm,shortName:nm,isin:document.getElementById('f-isin').value.trim(),
+      ticker:document.getElementById('f-ticker').value.trim(),type:'Fondo Azionario',cat:'fondo',
+      invested:parseFloat(document.getElementById('f-inv').value)||null,
+      shares:parseFloat(document.getElementById('f-shares').value)||null,
+      buyPrice:parseFloat(document.getElementById('f-buy').value)||null,
+      curRef:null,date:document.getElementById('f-date').value,pac:parseFloat(document.getElementById('f-pac').value)||0};
+    ['f-name','f-isin','f-ticker','f-inv','f-shares','f-buy','f-pac'].forEach(id=>{document.getElementById(id).value='';});
+    showMsg('f-msg','Salvato!');
+  } else if(tab==='btp'){
+    const nm=document.getElementById('b-name').value.trim();
+    if(!nm){showMsg('b-msg','Inserisci una descrizione.',true);return;}
+    const nom=parseFloat(document.getElementById('b-nom').value)||null;
+    const bpr=parseFloat(document.getElementById('b-price').value)||null;
+    inv={...inv,name:nm,shortName:nm,isin:document.getElementById('b-isin').value.trim(),
+      ticker:document.getElementById('b-ticker').value.trim()||null,type:'BTP / Obbligazione',cat:'btp',
+      invested:parseFloat(document.getElementById('b-inv').value)||null,
+      nominal:nom,shares:nom?nom/100:null,buyPrice:bpr,curRef:bpr&&nom?bpr/100*nom:null,
+      coupon:parseFloat(document.getElementById('b-coupon').value)||null,
+      maturity:document.getElementById('b-mat').value,date:document.getElementById('b-date').value,pac:0};
+    ['b-name','b-isin','b-ticker','b-inv','b-nom','b-coupon','b-price','b-mat'].forEach(id=>{document.getElementById(id).value='';});
+    showMsg('b-msg','BTP salvato!');
+  } else if(tab==='cert'){
+    const nm=document.getElementById('c-name').value.trim();
+    if(!nm){showMsg('c-msg','Inserisci una descrizione.',true);return;}
+    inv={...inv,name:nm,shortName:nm,isin:document.getElementById('c-isin').value.trim(),
+      ticker:document.getElementById('c-ticker').value.trim()||null,type:'Certificato',cat:'cert',
+      invested:parseFloat(document.getElementById('c-inv').value)||null,
+      curRef:parseFloat(document.getElementById('c-cur').value)||null,
+      coupon:parseFloat(document.getElementById('c-coupon').value)||null,
+      couponFreq:document.getElementById('c-freq').value,
+      barrier:parseFloat(document.getElementById('c-bar').value)||null,
+      maturity:document.getElementById('c-mat').value,date:document.getElementById('c-date').value,shares:null,buyPrice:null,pac:0};
+    ['c-name','c-isin','c-ticker','c-inv','c-cur','c-coupon','c-bar','c-mat'].forEach(id=>{document.getElementById(id).value='';});
+    showMsg('c-msg','Certificato salvato!');
+  }
+  portfolio.push(inv);save();render();notif('Investimento aggiunto!');
+}
+function saveLiq(){liquidita=parseFloat(document.getElementById('liq-val').value)||0;save();render();notif('Liquidità salvata.');}
+function saveNote(){note=document.getElementById('note-txt').value;save();notif('Note salvate.');}
+function showMsg(id,msg,isErr=false){
+  const el=document.getElementById(id);
+  el.textContent=msg;el.className='form-msg'+(isErr?' e':'');
+  setTimeout(()=>{el.textContent='';},3000);
+}
+let notifT;
+function notif(msg,isErr=false){
+  const el=document.getElementById('notif');
+  el.textContent=msg;el.style.background=isErr?'var(--red)':'var(--text)';
+  el.classList.add('show');clearTimeout(notifT);
+  notifT=setTimeout(()=>el.classList.remove('show'),2800);
+}
+// ==================== INIT ====================
+load();
+loadDefaults();
+render();
+const td=new Date().toISOString().split('T')[0];
+['e-date','f-date','b-date','c-date'].forEach(id=>{const el=document.getElementById(id);if(el&&!el.value)el.value=td;});
+</script>
+</body>
+</html>
