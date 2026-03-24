@@ -382,29 +382,24 @@ let prices={};
 let liquidita=0;
 let note='';
 
-// ==================== STORAGE ====================
+// ==================== STORAGE (Versione v3 per reset mobile) ====================
 function save(){
-  localStorage.setItem('pf_dm_v2', JSON.stringify({portfolio, liquidita, note}));
+  try{ localStorage.setItem('pf_dm_v3', JSON.stringify({portfolio, liquidita, note})); } catch(e){}
 }
-
 function load(){
-  const d = localStorage.getItem('pf_dm_v2');
-  if(d){
-    const o = JSON.parse(d);
-    portfolio = o.portfolio || [];
-    liquidita = o.liquidita || 0;
-    note = o.note || '';
-  }
+  try {
+    const d = localStorage.getItem('pf_dm_v3');
+    if(d){ const o = JSON.parse(d); portfolio=o.portfolio||[]; liquidita=o.liquidita||0; note=o.note||''; }
+  } catch(e){ portfolio=[]; }
 }
-
 function hardReset() {
-  if(confirm("Vuoi ricaricare i dati originali del PDF Zurich? (I dati attuali verranno sovrascritti)")) {
-    localStorage.removeItem('pf_dm_v2');
+  if(confirm("Vuoi ricaricare i dati originali del PDF Zurich?")){
+    localStorage.removeItem('pf_dm_v3');
     location.reload();
   }
 }
 
-// ==================== DATI PDF ZURICH ====================
+// ==================== DATI PDF ZURICH (Capitale reale versato) ====================
 function loadDefaults(){
   if(portfolio.length > 0) return;
   portfolio=[
@@ -421,7 +416,7 @@ function loadDefaults(){
   save();
 }
 
-// ==================== API PREZZI ====================
+// ==================== API PREZZI (Proxy + Pausa) ====================
 async function fetchPrice(ticker) {
   if (!ticker) return null;
   const proxy = "https://api.allorigins.win/get?url=";
@@ -430,114 +425,120 @@ async function fetchPrice(ticker) {
     const r = await fetch(proxy + encodeURIComponent(target) + "&cb=" + Date.now());
     const data = await r.json();
     const d = JSON.parse(data.contents);
-    const meta = d?.chart?.result?.[0]?.meta;
-    return meta?.regularMarketPrice || meta?.previousClose || null;
+    return d?.chart?.result?.[0]?.meta?.regularMarketPrice || d?.chart?.result?.[0]?.meta?.previousClose || null;
   } catch(e) { return null; }
 }
 
 async function refreshAll() {
-  const dot = document.getElementById('dot');
-  const stxt = document.getElementById('status-txt');
-  dot.className = 'dot loading';
-  stxt.textContent = 'Aggiornamento...';
-  
-  const tickers = [...new Set(portfolio.filter(p => p.ticker).map(p => p.ticker))];
-  let ok = 0;
-  for (const t of tickers) {
+  const dot=document.getElementById('dot'); const stxt=document.getElementById('status-txt');
+  dot.className='dot loading'; stxt.textContent='Aggiornamento...';
+  const tickers = [...new Set(portfolio.filter(p=>p.ticker).map(p=>p.ticker))];
+  let ok=0;
+  for(const t of tickers){
     const p = await fetchPrice(t);
-    if (p !== null) { prices[t] = p; ok++; }
-    await new Promise(r => setTimeout(r, 600)); // Pausa anti-blocco
+    if(p!==null){ prices[t]=p; ok++; }
+    await new Promise(res => setTimeout(res, 600));
   }
-  
-  dot.className = ok > 0 ? 'dot live' : 'dot err';
-  stxt.textContent = ok > 0 ? `Aggiornato: ${new Date().toLocaleTimeString()}` : 'Errore connessione';
+  dot.className=ok>0?'dot live':'dot err';
+  stxt.textContent=ok>0?`Aggiornato: ${new Date().toLocaleTimeString()}`:'Errore API';
   render();
 }
 
-// ==================== LOGICA RENDERING ====================
-function getCurVal(inv) {
+// ==================== CALCOLI & RENDER ====================
+function getCurVal(inv){
   const p = (inv.ticker && prices[inv.ticker]) || null;
-  if (p !== null) return p * inv.shares;
-  return inv.curRef || 0;
+  return p !== null ? (p * inv.shares) : (inv.curRef || 0);
+}
+function f(n, d=2){ return new Intl.NumberFormat('it-IT', {minimumFractionDigits:d, maximumFractionDigits:d}).format(n || 0); }
+function fe(n){ return '€ ' + f(n); }
+
+function render(){
+  renderMetrics();
+  renderTable();
+  renderCharts();
+  renderPac();
+  document.getElementById('liq-val').value = liquidita;
+  document.getElementById('note-txt').value = note;
+  document.getElementById('cnt').textContent = portfolio.length;
 }
 
-function f(n, d=2) { return new Intl.NumberFormat('it-IT', {minimumFractionDigits:d, maximumFractionDigits:d}).format(n || 0); }
-function fe(n) { return '€ ' + f(n); }
-
-function renderMetrics() {
-  let totCur = liquidita, totInv = 0;
-  portfolio.forEach(inv => {
-    totCur += getCurVal(inv);
-    totInv += (inv.invested || 0);
-  });
-  
+function renderMetrics(){
+  let totCur=liquidita, totInv=0;
+  portfolio.forEach(inv => { totCur += getCurVal(inv); totInv += (inv.invested || 0); });
   document.getElementById('m-cur').textContent = fe(totCur);
   document.getElementById('m-inv').textContent = fe(totInv);
-  
   const pnl = totCur - totInv;
   const pct = totInv > 0 ? (pnl / totInv * 100) : 0;
-  const pnlEl = document.getElementById('m-pnl');
-  pnlEl.textContent = (pnl >= 0 ? '+ € ' : '- € ') + f(Math.abs(pnl));
-  pnlEl.className = 'm-val ' + (pnl >= 0 ? 'pos' : 'neg');
-  
-  const pctEl = document.getElementById('m-pct');
-  pctEl.textContent = (pct >= 0 ? '+' : '') + f(pct) + '%';
-  pctEl.className = 'm-sub ' + (pct >= 0 ? 'pos' : 'neg');
-  document.getElementById('m-date').textContent = new Date().toLocaleDateString('it-IT', {day:'2-digit', month:'long'});
+  document.getElementById('m-pnl').textContent = (pnl>=0?'+ ':'- ') + fe(Math.abs(pnl));
+  document.getElementById('m-pnl').className = 'm-val ' + (pnl>=0?'pos':'neg');
+  document.getElementById('m-pct').textContent = (pct>=0?'+':'') + f(pct) + '%';
+  document.getElementById('m-pct').className = 'm-sub ' + (pct>=0?'pos':'neg');
+  document.getElementById('m-date').textContent = new Date().toLocaleDateString('it-IT', {day:'2-digit', month:'long', year:'numeric'});
 }
 
-function renderTable() {
+function renderTable(){
   const tbody = document.getElementById('tbl-body');
   let totCur = portfolio.reduce((s, inv) => s + getCurVal(inv), 0) + liquidita;
   let rows = '';
-  
   portfolio.forEach((inv, i) => {
     const cur = getCurVal(inv);
     const pnl = cur - inv.invested;
-    const pct = inv.invested > 0 ? (pnl / inv.invested * 100) : 0;
-    const pp = totCur > 0 ? (cur / totCur * 100) : 0;
-    
+    const pct = inv.invested > 0 ? (pnl/inv.invested*100) : 0;
+    const pp = totCur > 0 ? (cur/totCur*100) : 0;
     rows += `<tr>
       <td class="name-col"><div class="fund-name">${inv.name}</div><div class="fund-meta">${inv.isin}</div></td>
       <td>${inv.type}</td>
-      <td>${f(inv.shares, 2)}</td>
+      <td>${f(inv.shares, 4)}</td>
       <td>${fe(inv.invested)}</td>
       <td><strong>${fe(cur)}</strong></td>
       <td>€ ${f(prices[inv.ticker] || (cur/inv.shares))}</td>
       <td>€ ${f(inv.buyPrice)}</td>
-      <td><span class="pill ${pnl >= 0 ? 'pill-pos' : 'pill-neg'}">${pnl >= 0 ? '+ ' : '- '}${fe(Math.abs(pnl))}</span></td>
-      <td><span class="pill ${pnl >= 0 ? 'pill-pos' : 'pill-neg'}">${pct >= 0 ? '+' : ''}${f(pct)}%</span></td>
+      <td><span class="pill ${pnl>=0?'pill-pos':'pill-neg'}">${pnl>=0?'+':'-'} ${fe(Math.abs(pnl))}</span></td>
+      <td><span class="pill ${pnl>=0?'pill-pos':'pill-neg'}">${pct>=0?'+':''}${f(pct)}%</span></td>
       <td>${new Date(inv.date).toLocaleDateString('it-IT')}</td>
-      <td>${f(pp, 1)}%</td>
+      <td>${f(pp,1)}%</td>
       <td><button class="btn-del" onclick="delInv(${i})">✕</button></td>
     </tr>`;
   });
   tbody.innerHTML = rows;
 }
 
-// Chart.js (Semplificato per stabilità)
 let pieInst=null;
 function renderCharts(){
   const ctx = document.getElementById('pieC').getContext('2d');
   if(pieInst) pieInst.destroy();
-  const data = portfolio.map(inv => getCurVal(inv));
-  if(liquidita > 0) data.push(liquidita);
-  
+  const data = [...portfolio.map(inv => getCurVal(inv)), liquidita];
+  const labels = [...portfolio.map(inv => inv.name), 'Liquidità'];
   pieInst = new Chart(ctx, {
     type: 'doughnut',
-    data: {
-      labels: [...portfolio.map(inv => inv.name), 'Liquidità'],
-      datasets: [{ data, backgroundColor: COLORS }]
-    },
+    data: { labels, datasets: [{ data, backgroundColor: COLORS }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
 }
 
-// Funzioni Interfaccia
+function renderPac(){
+  const pacInvs = portfolio.filter(p => p.pac > 0);
+  const pacCards = document.getElementById('pac-cards');
+  pacCards.innerHTML = pacInvs.map(inv => `
+    <div class="pac-card">
+      <div class="pac-card-title">${inv.name}</div>
+      <div class="pac-row"><span>PAC</span><span>${fe(inv.pac)}/mese</span></div>
+      <div class="pac-row"><span>Valore Attuale</span><span>${fe(getCurVal(inv))}</span></div>
+    </div>
+  `).join('');
+}
+
+// ==================== INTERFACCIA & TAB ====================
 function tog(id){ document.getElementById('bd-'+id).classList.toggle('hidden'); }
+function switchTab(tab){
+  ['etf','fondo','btp','cert'].forEach(t => {
+    document.getElementById('tab-'+t).className = 'tab' + (t===tab?' active':'');
+    document.getElementById('frm-'+t).style.display = (t===tab?'':'none');
+  });
+}
 function delInv(i){ if(confirm('Eliminare?')){ portfolio.splice(i,1); save(); render(); } }
 function saveLiq(){ liquidita = parseFloat(document.getElementById('liq-val').value) || 0; save(); render(); }
-function render() { renderMetrics(); renderTable(); renderCharts(); }
+function saveNote(){ note = document.getElementById('note-txt').value; save(); }
 
 // Avvio
 load();
