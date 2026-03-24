@@ -530,17 +530,7 @@ function loadDefaults(){
 }
 
 // ==================== PREZZI ====================
-async function fetchPrice(ticker){
-  if(!ticker||!ticker.trim())return null;
-  try{
-    const r=await fetch(`https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.trim())}?interval=1d&range=1d`);
-    if(!r.ok)return null;
-    const d=await r.json();
-    const meta=d?.chart?.result?.[0]?.meta;
-    if(!meta)return null;
-    return meta.regularMarketPrice||meta.previousClose||null;
-  }catch(e){return null;}
-}
+
 
 async function refreshAll(){
   const dot=document.getElementById('dot');
