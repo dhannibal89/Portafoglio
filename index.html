@@ -518,6 +518,8 @@ function renderCharts(){
 
 function renderPac(){
   const pacInvs = portfolio.filter(p => p.pac > 0);
+  
+  // Popola le card grafiche
   const pacCards = document.getElementById('pac-cards');
   pacCards.innerHTML = pacInvs.map(inv => `
     <div class="pac-card">
@@ -526,6 +528,50 @@ function renderPac(){
       <div class="pac-row"><span>Valore Attuale</span><span>${fe(getCurVal(inv))}</span></div>
     </div>
   `).join('');
+
+  // FIX: Popola il menu a tendina per registrare i versamenti
+  const sel = document.getElementById('pac-sel');
+  if(sel) {
+    sel.innerHTML = pacInvs.map(inv => `<option value="${portfolio.indexOf(inv)}">${inv.name} (€${inv.pac})</option>`).join('');
+  }
+}
+
+  function addPac(){
+  const idx = parseInt(document.getElementById('pac-sel').value);
+  const amt = parseFloat(document.getElementById('pac-amt').value); // Importo (es. 200€)
+  let sh = parseFloat(document.getElementById('pac-shares').value);  // Quote inserite a mano
+  let pr = parseFloat(document.getElementById('pac-price').value);   // Prezzo inserito a mano
+  
+  const inv = portfolio[idx];
+  if(!inv) return;
+
+  // LOGICA AUTOMATICA: Se non inserisci il prezzo, usa quello di Yahoo (prices)
+  if(isNaN(pr)) {
+    pr = prices[inv.ticker] || (getCurVal(inv) / inv.shares); 
+  }
+
+  // LOGICA AUTOMATICA: Se non inserisci le quote, le calcola l'app (Importo / Prezzo)
+  if(isNaN(sh)) {
+    sh = amt / pr;
+  }
+
+  if(isNaN(amt) || isNaN(sh) || pr === 0) { 
+    alert("Attenzione: Carica i prezzi premendo 'Aggiorna prezzi' prima di registrare il PAC, oppure inserisci i dati manualmente."); 
+    return; 
+  }
+
+  // Aggiornamento quote e capitale versato
+  inv.invested = (inv.invested || 0) + amt;
+  inv.shares = (inv.shares || 0) + sh;
+  inv.buyPrice = inv.invested / inv.shares; // Ricalcola il nuovo prezzo medio
+
+  save();
+  render();
+  
+  // Pulisce i campi e avvisa
+  document.getElementById('pac-shares').value = '';
+  document.getElementById('pac-price').value = '';
+  alert(`Versamento registrato! Con ${amt}€ hai acquistato ${sh.toFixed(4)} quote di ${inv.name} al prezzo di €${f(pr)}.`);
 }
 
 // ==================== INTERFACCIA & TAB ====================
