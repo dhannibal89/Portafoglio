@@ -534,13 +534,8 @@ function loadDefaults(){
 
 async function fetchPrice(ticker){
   if(!ticker||!ticker.trim()) return null;
-  
-  // Endpoint più leggero e affidabile
   const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(ticker.trim())}`;
-  
-  // Proxy attualmente più stabile
   const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
-  
   try{
     const r = await fetch(proxyUrl);
     if(!r.ok) return null;
