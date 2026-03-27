@@ -375,34 +375,92 @@ hr{border:none;border-top:.5px solid var(--border);margin:14px 0;}
 <div class="notif" id="notif"></div>
 
 <script>
-// ==================== COLORI & STATO ====================
-const COLORS=['#2d7dd2','#1a9268','#cc5228','#7060d8','#b87010','#c04878','#448820','#d04040','#20a0a0','#888880','#5090e0','#40b878'];
-let portfolio=[];
-let prices={};
-let liquidita=0;
-let note='';
+// ==================== CONFIG ====================
+const COLORS = ['#2d7dd2','#1a9268','#cc5228','#7060d8','#b87010','#c04878','#448820','#d04040','#20a0a0','#888880','#5090e0','#40b878'];
+const STORAGE_KEY = 'pf_dm_v4';
+let portfolio = [];
+let prices = {};
+let liquidita = 0;
+let note = '';
+let pieInst = null;
+let barInst = null;
 
-// ==================== STORAGE (Versione v3 per reset mobile) ====================
-function save(){
-  try{ localStorage.setItem('pf_dm_v3', JSON.stringify({portfolio, liquidita, note})); } catch(e){}
+// ==================== UTILS ====================
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
-function load(){
+function safeNum(n, fallback = 0) {
+  const v = Number(n);
+  return Number.isFinite(v) ? v : fallback;
+}
+function f(n, d = 2) {
+  const value = safeNum(n, 0);
+  return new Intl.NumberFormat('it-IT', {
+    minimumFractionDigits: d,
+    maximumFractionDigits: d
+  }).format(value);
+}
+function fe(n) { return '€ ' + f(n); }
+function formatDate(value) {
+  if (!value) return '—';
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('it-IT');
+}
+function showNotif(msg, isError = false) {
+  const el = document.getElementById('notif');
+  el.textContent = msg;
+  el.style.background = isError ? 'var(--red)' : 'var(--text)';
+  el.classList.add('show');
+  clearTimeout(showNotif._t);
+  showNotif._t = setTimeout(() => el.classList.remove('show'), 2200);
+}
+function nextColor(index) {
+  return COLORS[index % COLORS.length];
+}
+function getLivePrice(inv) {
+  const data = inv?.ticker ? prices[inv.ticker] : null;
+  return data && Number.isFinite(data.val) ? data.val : null;
+}
+
+// ==================== STORAGE ====================
+function save() {
   try {
-    const d = localStorage.getItem('pf_dm_v3');
-    if(d){ const o = JSON.parse(d); portfolio=o.portfolio||[]; liquidita=o.liquidita||0; note=o.note||''; }
-  } catch(e){ portfolio=[]; }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ portfolio, liquidita, note }));
+  } catch (e) {
+    console.warn('Salvataggio non riuscito', e);
+  }
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    portfolio = Array.isArray(data.portfolio) ? data.portfolio : [];
+    liquidita = safeNum(data.liquidita, 0);
+    note = typeof data.note === 'string' ? data.note : '';
+  } catch (e) {
+    portfolio = [];
+    liquidita = 0;
+    note = '';
+  }
 }
 function hardReset() {
-  if(confirm("Vuoi ricaricare i dati originali del PDF Zurich?")){
-    localStorage.removeItem('pf_dm_v3');
+  if (confirm('Vuoi ripristinare i dati iniziali?')) {
+    localStorage.removeItem(STORAGE_KEY);
     location.reload();
   }
 }
 
-// ==================== DATI PDF ZURICH (Capitale reale versato) ====================
-function loadDefaults(){
-  if(portfolio.length > 0) return;
-  portfolio=[
+// ==================== DATI INIZIALI ====================
+function loadDefaults() {
+  if (portfolio.length > 0) return;
+  portfolio = [
     { id:1, name:'iShares Core S&P 500', isin:'IE00B5BMR087', ticker:'CSSPX.MI', type:'ETF Azionario', cat:'etf', invested:49814.00, shares:80, buyPrice:622.67, curRef:48810.40, date:'2025-10-14', pac:0 },
     { id:2, name:'Vanguard FTSE All-World', isin:'IE00BK5BQT80', ticker:'VWCE.MI', type:'ETF Azionario', cat:'etf', invested:39978.75, shares:280, buyPrice:142.78, curRef:40252.80, date:'2025-10-14', pac:0 },
     { id:3, name:'iShares € Govt Bond 3-7yr', isin:'IE00B3VTML14', ticker:'IBGX.MI', type:'ETF Obbligazionario', cat:'etf', invested:20091.75, shares:150, buyPrice:133.94, curRef:19912.50, date:'2025-10-14', pac:0 },
@@ -416,210 +474,330 @@ function loadDefaults(){
   save();
 }
 
-// ==================== API PREZZI (Proxy + Pausa) ====================
+// ==================== PREZZI ====================
 async function fetchPrice(ticker) {
   if (!ticker) return null;
-  const proxy = "https://api.allorigins.win/get?url=";
+  const proxy = 'https://api.allorigins.win/get?url=';
   const target = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker.trim())}?interval=1d&range=1d`;
   try {
-    const r = await fetch(proxy + encodeURIComponent(target) + "&cb=" + Date.now());
-    const data = await r.json();
-    const d = JSON.parse(data.contents);
-    const meta = d?.chart?.result?.[0]?.meta;
-    
-    const current = meta?.regularMarketPrice || meta?.previousClose;
-    const prev = meta?.previousClose;
-    // Calcolo variazione % rispetto a ieri
-    const dailyChange = (current && prev) ? ((current - prev) / prev * 100) : 0;
-
+    const response = await fetch(proxy + encodeURIComponent(target) + '&cb=' + Date.now(), {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    const raw = await response.json();
+    if (!raw.contents) throw new Error('Risposta vuota');
+    const data = JSON.parse(raw.contents);
+    const meta = data?.chart?.result?.[0]?.meta;
+    const current = Number(meta?.regularMarketPrice ?? meta?.previousClose);
+    const prev = Number(meta?.previousClose);
+    if (!Number.isFinite(current)) return null;
+    const dailyChange = Number.isFinite(prev) && prev !== 0 ? ((current - prev) / prev) * 100 : 0;
     return { val: current, change: dailyChange };
-  } catch(e) { return null; }
-}
-
-async function refreshAll() {
-  const dot=document.getElementById('dot'); const stxt=document.getElementById('status-txt');
-  dot.className='dot loading'; stxt.textContent='Aggiornamento...';
-  const tickers = [...new Set(portfolio.filter(p=>p.ticker).map(p=>p.ticker))];
-  let ok=0;
-  for(const t of tickers){
-    const p = await fetchPrice(t);
-    if(p!==null){ prices[t]=p; ok++; } // Qui salviamo l'oggetto {val, change}
-    await new Promise(res => setTimeout(res, 600));
+  } catch (e) {
+    console.warn('Prezzo non disponibile per', ticker, e);
+    return null;
   }
-  dot.className=ok>0?'dot live':'dot err';
-  stxt.textContent=ok>0?`Aggiornato: ${new Date().toLocaleTimeString()}`:'Errore API';
+}
+async function refreshAll() {
+  const dot = document.getElementById('dot');
+  const stxt = document.getElementById('status-txt');
+  dot.className = 'dot loading';
+  stxt.textContent = 'Aggiornamento...';
+
+  const tickers = [...new Set(portfolio.map(p => p.ticker).filter(Boolean))];
+  let ok = 0;
+
+  for (const ticker of tickers) {
+    const data = await fetchPrice(ticker);
+    if (data) {
+      prices[ticker] = data;
+      ok++;
+    }
+    await new Promise(res => setTimeout(res, 450));
+  }
+
+  if (ok > 0) {
+    dot.className = 'dot live';
+    stxt.textContent = `Aggiornato: ${new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
+    showNotif(`Quotazioni aggiornate (${ok}/${tickers.length})`);
+  } else {
+    dot.className = 'dot err';
+    stxt.textContent = 'Errore API o CORS';
+    showNotif('Aggiornamento non riuscito', true);
+  }
   render();
 }
 
-// ==================== CALCOLI & RENDER ====================
-function getCurVal(inv){
-  const pData = (inv.ticker && prices[inv.ticker]) ? prices[inv.ticker] : null;
-  const p = pData ? pData.val : null;
-  return p !== null ? (p * inv.shares) : (inv.curRef || 0);
+// ==================== CALCOLI ====================
+function getCurVal(inv) {
+  const live = getLivePrice(inv);
+  if (live !== null) return live * safeNum(inv.shares, 0);
+  return safeNum(inv.curRef, 0);
 }
-function f(n, d=2){ return new Intl.NumberFormat('it-IT', {minimumFractionDigits:d, maximumFractionDigits:d}).format(n || 0); }
-function fe(n){ return '€ ' + f(n); }
+function getDisplayedUnitPrice(inv) {
+  const live = getLivePrice(inv);
+  if (live !== null) return live;
+  const shares = safeNum(inv.shares, 0);
+  if (shares > 0 && Number.isFinite(inv.curRef)) return safeNum(inv.curRef) / shares;
+  return safeNum(inv.buyPrice, 0);
+}
+function getTotals() {
+  const invested = portfolio.reduce((sum, inv) => sum + safeNum(inv.invested, 0), 0);
+  const investedOnly = portfolio.reduce((sum, inv) => sum + getCurVal(inv), 0);
+  const current = investedOnly + liquidita;
+  return { invested, current, investedOnly };
+}
 
-function render(){
+// ==================== RENDER ====================
+function render() {
   renderMetrics();
   renderTable();
   renderCharts();
   renderPac();
-  document.getElementById('liq-val').value = liquidita;
-  document.getElementById('note-txt').value = note;
+  document.getElementById('liq-val').value = safeNum(liquidita, 0);
+  document.getElementById('note-txt').value = note || '';
   document.getElementById('cnt').textContent = portfolio.length;
 }
+function renderMetrics() {
+  const { invested, current } = getTotals();
+  const pnl = current - invested;
+  const pct = invested > 0 ? (pnl / invested) * 100 : 0;
+  document.getElementById('m-cur').textContent = fe(current);
+  document.getElementById('m-inv').textContent = fe(invested);
+  document.getElementById('m-pnl').textContent = `${pnl >= 0 ? '+ ' : '- '}${fe(Math.abs(pnl))}`;
+  document.getElementById('m-pnl').className = 'm-val ' + (pnl >= 0 ? 'pos' : 'neg');
+  document.getElementById('m-pct').textContent = `${pct >= 0 ? '+' : ''}${f(pct)}%`;
+  document.getElementById('m-pct').className = 'm-sub ' + (pct >= 0 ? 'pos' : 'neg');
+  document.getElementById('m-date').textContent = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'long', year:'numeric' });
 
-function renderMetrics(){
-  let totCur=liquidita, totInv=0;
-  portfolio.forEach(inv => { totCur += getCurVal(inv); totInv += (inv.invested || 0); });
-  document.getElementById('m-cur').textContent = fe(totCur);
-  document.getElementById('m-inv').textContent = fe(totInv);
-  const pnl = totCur - totInv;
-  const pct = totInv > 0 ? (pnl / totInv * 100) : 0;
-  document.getElementById('m-pnl').textContent = (pnl>=0?'+ ':'- ') + fe(Math.abs(pnl));
-  document.getElementById('m-pnl').className = 'm-val ' + (pnl>=0?'pos':'neg');
-  document.getElementById('m-pct').textContent = (pct>=0?'+':'') + f(pct) + '%';
-  document.getElementById('m-pct').className = 'm-sub ' + (pct>=0?'pos':'neg');
-  document.getElementById('m-date').textContent = new Date().toLocaleDateString('it-IT', {day:'2-digit', month:'long', year:'numeric'});
+  const pacMonthly = portfolio.reduce((sum, inv) => sum + safeNum(inv.pac, 0), 0);
+  document.getElementById('m-pac-sub').textContent = pacMonthly > 0
+    ? `${portfolio.filter(p => safeNum(p.pac,0) > 0).length} strumenti attivi`
+    : 'Nessun PAC attivo';
 }
-
-function renderTable(){
+function renderTable() {
   const tbody = document.getElementById('tbl-body');
-  let totCur = portfolio.reduce((s, inv) => s + getCurVal(inv), 0) + liquidita;
+  const { current } = getTotals();
   let rows = '';
+
   portfolio.forEach((inv, i) => {
     const cur = getCurVal(inv);
-    const pnl = cur - inv.invested;
-    const pct = inv.invested > 0 ? (pnl/inv.invested*100) : 0;
-    const pp = totCur > 0 ? (cur/totCur*100) : 0;
+    const invested = safeNum(inv.invested, 0);
+    const pnl = cur - invested;
+    const pct = invested > 0 ? (pnl / invested) * 100 : 0;
+    const pp = current > 0 ? (cur / current) * 100 : 0;
+
     rows += `<tr>
-      <td class="name-col"><div class="fund-name">${inv.name}</div><div class="fund-meta">${inv.isin}</div></td>
-      <td>${inv.type}</td>
+      <td class="name-col">
+        <div class="fund-name">${escapeHtml(inv.name)}</div>
+        <div class="fund-meta">${escapeHtml(inv.isin || '—')}</div>
+      </td>
+      <td>${escapeHtml(inv.type || '—')}</td>
       <td>${f(inv.shares, 4)}</td>
-      <td>${fe(inv.invested)}</td>
+      <td>${fe(invested)}</td>
       <td><strong>${fe(cur)}</strong></td>
-      <td>€ ${f(prices[inv.ticker] || (cur/inv.shares))}</td>
+      <td>€ ${f(getDisplayedUnitPrice(inv))}</td>
       <td>€ ${f(inv.buyPrice)}</td>
-      <td><span class="pill ${pnl>=0?'pill-pos':'pill-neg'}">${pnl>=0?'+':'-'} ${fe(Math.abs(pnl))}</span></td>
-      <td><span class="pill ${pnl>=0?'pill-pos':'pill-neg'}">${pct>=0?'+':''}${f(pct)}%</span></td>
-      <td>${new Date(inv.date).toLocaleDateString('it-IT')}</td>
-      <td>${f(pp,1)}%</td>
-      <td><button class="btn-del" onclick="delInv(${i})">✕</button></td>
+      <td><span class="pill ${pnl >= 0 ? 'pill-pos' : 'pill-neg'}">${pnl >= 0 ? '+' : '-'} ${fe(Math.abs(pnl))}</span></td>
+      <td><span class="pill ${pnl >= 0 ? 'pill-pos' : 'pill-neg'}">${pct >= 0 ? '+' : ''}${f(pct)}%</span></td>
+      <td>${formatDate(inv.date)}</td>
+      <td>${f(pp, 1)}%</td>
+      <td><button class="btn-del" onclick="delInv(${i})" aria-label="Elimina investimento">✕</button></td>
     </tr>`;
   });
-  tbody.innerHTML = rows;
-}
 
-let pieInst=null;
-function renderCharts(){
-  const ctx = document.getElementById('pieC').getContext('2d');
-  if(pieInst) pieInst.destroy();
-  const data = [...portfolio.map(inv => getCurVal(inv)), liquidita];
+  tbody.innerHTML = rows || `<tr><td colspan="12" class="nd" style="padding:16px;">Nessun investimento inserito.</td></tr>`;
+}
+function renderCharts() {
+  renderPieChart();
+  renderBarChart();
+}
+function renderPieChart() {
+  const canvas = document.getElementById('pieC');
+  const ctx = canvas.getContext('2d');
+  if (pieInst) pieInst.destroy();
+
   const labels = [...portfolio.map(inv => inv.name), 'Liquidità'];
-  
+  const data = [...portfolio.map(inv => getCurVal(inv)), liquidita];
+  const bg = labels.map((_, i) => nextColor(i));
+
   pieInst = new Chart(ctx, {
     type: 'doughnut',
-    data: { labels, datasets: [{ data, backgroundColor: COLORS }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    data: { labels, datasets: [{ data, backgroundColor: bg, borderWidth: 0 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } }
+    }
   });
 
   const leg = document.getElementById('pie-leg');
   leg.innerHTML = portfolio.map((inv, i) => {
-    const d = prices[inv.ticker]; // Dati di Yahoo (prezzo + variazione)
-    const changeHtml = d ? 
-      `<span style="color:${d.change >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:bold; font-size:11px; margin-left:8px;">
-        ${d.change >= 0 ? '▲' : '▼'} ${d.change.toFixed(2)}%
-      </span>` : '';
-    
+    const d = inv.ticker ? prices[inv.ticker] : null;
+    const changeHtml = d
+      ? `<span style="color:${d.change >= 0 ? 'var(--green)' : 'var(--red)'};font-weight:700;font-size:11px;margin-left:8px;">${d.change >= 0 ? '▲' : '▼'} ${f(d.change, 2)}%</span>`
+      : '';
     return `<div class="leg-item">
       <div class="leg-label">
-        <span class="leg-dot" style="background:${COLORS[i]}"></span>
-        <span class="leg-name">${inv.name}</span>
+        <span class="leg-dot" style="background:${nextColor(i)}"></span>
+        <span class="leg-name">${escapeHtml(inv.name)}</span>
         ${changeHtml}
       </div>
       <div class="leg-val">${fe(getCurVal(inv))}</div>
     </div>`;
-  }).join('') + (liquidita > 0 ? `<div class="leg-item"><div class="leg-label"><span class="leg-dot" style="background:${COLORS[portfolio.length]}"></span><span>Liquidità</span></div><div class="leg-val">${fe(liquidita)}</div></div>` : '');
+  }).join('') + (
+    liquidita > 0
+      ? `<div class="leg-item"><div class="leg-label"><span class="leg-dot" style="background:${nextColor(portfolio.length)}"></span><span>Liquidità</span></div><div class="leg-val">${fe(liquidita)}</div></div>`
+      : ''
+  );
 }
+function renderBarChart() {
+  const canvas = document.getElementById('barC');
+  const ctx = canvas.getContext('2d');
+  if (barInst) barInst.destroy();
 
-function renderPac(){
-  const pacInvs = portfolio.filter(p => p.pac > 0);
-  
-  // Popola le card grafiche
+  const labels = portfolio.map(inv => inv.name.length > 22 ? inv.name.slice(0, 22) + '…' : inv.name);
+  const data = portfolio.map(inv => {
+    const invested = safeNum(inv.invested, 0);
+    const pnl = getCurVal(inv) - invested;
+    return invested > 0 ? (pnl / invested) * 100 : 0;
+  });
+
+  barInst = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: data.map(v => v >= 0 ? 'rgba(26,146,104,0.75)' : 'rgba(204,82,40,0.75)'),
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--text2').trim() || '#666' },
+          grid: { display: false }
+        },
+        y: {
+          ticks: {
+            callback: value => value + '%',
+            color: getComputedStyle(document.documentElement).getPropertyValue('--text2').trim() || '#666'
+          },
+          grid: { color: 'rgba(128,128,128,0.15)' }
+        }
+      }
+    }
+  });
+}
+function renderPac() {
+  const pacInvs = portfolio.filter(p => safeNum(p.pac, 0) > 0);
   const pacCards = document.getElementById('pac-cards');
-  pacCards.innerHTML = pacInvs.map(inv => `
-    <div class="pac-card">
-      <div class="pac-card-title">${inv.name}</div>
-      <div class="pac-row"><span>PAC</span><span>${fe(inv.pac)}/mese</span></div>
-      <div class="pac-row"><span>Valore Attuale</span><span>${fe(getCurVal(inv))}</span></div>
-    </div>
-  `).join('');
-
-  // FIX: Popola il menu a tendina per registrare i versamenti
+  const pacTotal = document.getElementById('pac-total');
   const sel = document.getElementById('pac-sel');
-  if(sel) {
-    sel.innerHTML = pacInvs.map(inv => `<option value="${portfolio.indexOf(inv)}">${inv.name} (€${inv.pac})</option>`).join('');
-  }
+
+  pacCards.innerHTML = pacInvs.length
+    ? pacInvs.map(inv => `
+      <div class="pac-card">
+        <div class="pac-card-title">${escapeHtml(inv.name)}</div>
+        <div class="pac-row"><span>PAC</span><span>${fe(inv.pac)}/mese</span></div>
+        <div class="pac-row"><span>Valore attuale</span><span>${fe(getCurVal(inv))}</span></div>
+        <div class="pac-row"><span>Prezzo medio</span><span>${fe(inv.buyPrice)}</span></div>
+      </div>
+    `).join('')
+    : `<div class="nd">Nessun PAC attivo.</div>`;
+
+  const monthly = pacInvs.reduce((sum, inv) => sum + safeNum(inv.pac, 0), 0);
+  pacTotal.innerHTML = `<span>Totale PAC mensile</span><span>${fe(monthly)}</span>`;
+
+  sel.innerHTML = pacInvs.length
+    ? pacInvs.map(inv => `<option value="${portfolio.indexOf(inv)}">${escapeHtml(inv.name)} (${fe(inv.pac)})</option>`).join('')
+    : '<option value="">Nessun PAC attivo</option>';
 }
+function addPac() {
+  const idx = parseInt(document.getElementById('pac-sel').value, 10);
+  const amt = parseFloat(document.getElementById('pac-amt').value);
+  let sh = parseFloat(document.getElementById('pac-shares').value);
+  let pr = parseFloat(document.getElementById('pac-price').value);
 
-  function addPac(){
-  const idx = parseInt(document.getElementById('pac-sel').value);
-  const amt = parseFloat(document.getElementById('pac-amt').value); // Importo (es. 200€)
-  let sh = parseFloat(document.getElementById('pac-shares').value);  // Quote inserite a mano
-  let pr = parseFloat(document.getElementById('pac-price').value);   // Prezzo inserito a mano
-  
   const inv = portfolio[idx];
-  if(!inv) return;
-
-  // LOGICA AUTOMATICA: Se non inserisci il prezzo, usa quello di Yahoo (prices)
-  if(isNaN(pr)) {
-    pr = prices[inv.ticker] || (getCurVal(inv) / inv.shares); 
+  if (!inv) {
+    showNotif('Seleziona uno strumento PAC', true);
+    return;
+  }
+  if (!Number.isFinite(amt) || amt <= 0) {
+    showNotif('Importo PAC non valido', true);
+    return;
   }
 
-  // LOGICA AUTOMATICA: Se non inserisci le quote, le calcola l'app (Importo / Prezzo)
-  if(isNaN(sh)) {
-    sh = amt / pr;
+  if (!Number.isFinite(pr)) {
+    pr = getDisplayedUnitPrice(inv);
+  }
+  if (!Number.isFinite(sh)) {
+    sh = pr > 0 ? amt / pr : NaN;
+  }
+  if (!Number.isFinite(pr) || pr <= 0 || !Number.isFinite(sh) || sh <= 0) {
+    showNotif('Inserisci prezzo/quote validi o aggiorna prima i prezzi', true);
+    return;
   }
 
-  if(isNaN(amt) || isNaN(sh) || pr === 0) { 
-    alert("Attenzione: Carica i prezzi premendo 'Aggiorna prezzi' prima di registrare il PAC, oppure inserisci i dati manualmente."); 
-    return; 
-  }
-
-  // Aggiornamento quote e capitale versato
-  inv.invested = (inv.invested || 0) + amt;
-  inv.shares = (inv.shares || 0) + sh;
-  inv.buyPrice = inv.invested / inv.shares; // Ricalcola il nuovo prezzo medio
+  inv.invested = safeNum(inv.invested, 0) + amt;
+  inv.shares = safeNum(inv.shares, 0) + sh;
+  inv.buyPrice = inv.shares > 0 ? inv.invested / inv.shares : pr;
+  inv.curRef = getCurVal(inv);
 
   save();
   render();
-  
-  // Pulisce i campi e avvisa
+
   document.getElementById('pac-shares').value = '';
   document.getElementById('pac-price').value = '';
-  alert(`Versamento registrato! Con ${amt}€ hai acquistato ${sh.toFixed(4)} quote di ${inv.name} al prezzo di €${f(pr)}.`);
+  showNotif(`PAC registrato: ${inv.name}`);
 }
 
-// ==================== INTERFACCIA & TAB ====================
-function tog(id){ document.getElementById('bd-'+id).classList.toggle('hidden'); }
-function switchTab(tab){
+// ==================== UI ====================
+function tog(id) {
+  const body = document.getElementById('bd-' + id);
+  const icon = document.getElementById('tgl-' + id);
+  body.classList.toggle('hidden');
+  if (icon) icon.textContent = body.classList.contains('hidden') ? '▸' : '▾';
+}
+function switchTab(tab) {
   ['etf','fondo','btp','cert'].forEach(t => {
-    document.getElementById('tab-'+t).className = 'tab' + (t===tab?' active':'');
-    document.getElementById('frm-'+t).style.display = (t===tab?'':'none');
+    document.getElementById('tab-' + t).className = 'tab' + (t === tab ? ' active' : '');
+    document.getElementById('frm-' + t).style.display = (t === tab ? '' : 'none');
   });
 }
-function delInv(i){ if(confirm('Eliminare?')){ portfolio.splice(i,1); save(); render(); } }
-function saveLiq(){ liquidita = parseFloat(document.getElementById('liq-val').value) || 0; save(); render(); }
-function saveNote(){ note = document.getElementById('note-txt').value; save(); }
+function delInv(i) {
+  if (confirm('Eliminare questo investimento?')) {
+    portfolio.splice(i, 1);
+    save();
+    render();
+    showNotif('Investimento eliminato');
+  }
+}
+function saveLiq() {
+  liquidita = parseFloat(document.getElementById('liq-val').value) || 0;
+  save();
+  render();
+  showNotif('Liquidità aggiornata');
+}
+function saveNote() {
+  note = document.getElementById('note-txt').value || '';
+  save();
+  showNotif('Note salvate');
+}
 
-// Avvio
-function addInv(tab){
-  let inv = { id: Date.now() };
-  if(tab === 'etf'){
-    inv.name = document.getElementById('e-name').value;
-    inv.isin = document.getElementById('e-isin').value;
-    inv.ticker = document.getElementById('e-ticker').value;
+// ==================== AGGIUNTA STRUMENTI ====================
+function addInv(tab) {
+  const inv = { id: Date.now() };
+
+  if (tab === 'etf') {
+    inv.name = document.getElementById('e-name').value.trim();
+    inv.isin = document.getElementById('e-isin').value.trim();
+    inv.ticker = document.getElementById('e-ticker').value.trim();
     inv.invested = parseFloat(document.getElementById('e-inv').value);
     inv.shares = parseFloat(document.getElementById('e-shares').value);
     inv.buyPrice = parseFloat(document.getElementById('e-buy').value);
@@ -627,10 +805,10 @@ function addInv(tab){
     inv.date = document.getElementById('e-date').value;
     inv.pac = parseFloat(document.getElementById('e-pac').value) || 0;
     inv.cat = 'etf';
-  } else if(tab === 'fondo'){
-    inv.name = document.getElementById('f-name').value;
-    inv.isin = document.getElementById('f-isin').value;
-    inv.ticker = document.getElementById('f-ticker').value;
+  } else if (tab === 'fondo') {
+    inv.name = document.getElementById('f-name').value.trim();
+    inv.isin = document.getElementById('f-isin').value.trim();
+    inv.ticker = document.getElementById('f-ticker').value.trim();
     inv.invested = parseFloat(document.getElementById('f-inv').value);
     inv.shares = parseFloat(document.getElementById('f-shares').value);
     inv.buyPrice = parseFloat(document.getElementById('f-buy').value);
@@ -638,31 +816,65 @@ function addInv(tab){
     inv.date = document.getElementById('f-date').value;
     inv.pac = parseFloat(document.getElementById('f-pac').value) || 0;
     inv.cat = 'fondo';
-  } else if(tab === 'btp'){
-    inv.name = document.getElementById('b-name').value;
-    inv.isin = document.getElementById('b-isin').value;
-    inv.ticker = document.getElementById('b-ticker').value || null;
-    inv.invested = parseFloat(document.getElementById('b-inv').value);
+  } else if (tab === 'btp') {
     const nominal = parseFloat(document.getElementById('b-nom').value);
-    inv.shares = nominal / 100; 
+    inv.name = document.getElementById('b-name').value.trim();
+    inv.isin = document.getElementById('b-isin').value.trim();
+    inv.ticker = document.getElementById('b-ticker').value.trim() || null;
+    inv.invested = parseFloat(document.getElementById('b-inv').value);
+    inv.shares = Number.isFinite(nominal) ? nominal / 100 : NaN;
     inv.buyPrice = parseFloat(document.getElementById('b-price').value);
     inv.type = 'BTP/Obbligazione';
     inv.date = document.getElementById('b-date').value;
     inv.maturity = document.getElementById('b-mat').value;
-    inv.curRef = (inv.buyPrice / 100) * nominal;
+    inv.curRef = Number.isFinite(inv.buyPrice) && Number.isFinite(nominal) ? (inv.buyPrice / 100) * nominal : 0;
     inv.cat = 'btp';
     inv.pac = 0;
+    inv.nominal = nominal;
+    inv.coupon = parseFloat(document.getElementById('b-coupon').value) || 0;
+  } else if (tab === 'cert') {
+    inv.name = document.getElementById('c-name').value.trim();
+    inv.isin = document.getElementById('c-isin').value.trim();
+    inv.ticker = document.getElementById('c-ticker').value.trim() || null;
+    inv.invested = parseFloat(document.getElementById('c-inv').value);
+    inv.shares = 1;
+    inv.buyPrice = parseFloat(document.getElementById('c-inv').value);
+    inv.curRef = parseFloat(document.getElementById('c-cur').value) || 0;
+    inv.type = 'Certificato';
+    inv.date = document.getElementById('c-date').value;
+    inv.maturity = document.getElementById('c-mat').value;
+    inv.coupon = parseFloat(document.getElementById('c-coupon').value) || 0;
+    inv.freq = document.getElementById('c-freq').value;
+    inv.barrier = parseFloat(document.getElementById('c-bar').value) || 0;
+    inv.cat = 'cert';
+    inv.pac = 0;
   }
-  
-  if(!inv.name || isNaN(inv.invested)) { alert("Inserisci Nome e Capitale Versato!"); return; }
-  
+
+  if (!inv.name || !Number.isFinite(inv.invested) || inv.invested < 0) {
+    alert('Inserisci almeno nome e capitale versato validi.');
+    return;
+  }
+  if (!Number.isFinite(inv.shares) || inv.shares <= 0) {
+    alert('Inserisci un numero di quote/valore nominale valido.');
+    return;
+  }
+  if (!Number.isFinite(inv.buyPrice) || inv.buyPrice < 0) {
+    alert('Inserisci un prezzo medio/acquisto valido.');
+    return;
+  }
+
+  if (!Number.isFinite(inv.curRef) || inv.curRef <= 0) {
+    inv.curRef = inv.buyPrice * inv.shares;
+  }
+
   portfolio.push(inv);
   save();
   render();
-  alert("Registrato con successo!");
+  showNotif('Strumento registrato con successo');
 }
-  
-  load();
+
+// ==================== AVVIO ====================
+load();
 loadDefaults();
 render();
 </script>
