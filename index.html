@@ -425,7 +425,14 @@ async function fetchPrice(ticker) {
     const r = await fetch(proxy + encodeURIComponent(target) + "&cb=" + Date.now());
     const data = await r.json();
     const d = JSON.parse(data.contents);
-    return d?.chart?.result?.[0]?.meta?.regularMarketPrice || d?.chart?.result?.[0]?.meta?.previousClose || null;
+    const meta = d?.chart?.result?.[0]?.meta;
+    
+    const current = meta?.regularMarketPrice || meta?.previousClose;
+    const prev = meta?.previousClose;
+    // Calcoliamo la variazione percentuale rispetto a ieri
+    const dailyChange = (current && prev) ? ((current - prev) / prev * 100) : 0;
+
+    return { price: current, change: dailyChange };
   } catch(e) { return null; }
 }
 
@@ -436,7 +443,10 @@ async function refreshAll() {
   let ok=0;
   for(const t of tickers){
     const p = await fetchPrice(t);
-    if(p!==null){ prices[t]=p; ok++; }
+if(p!==null){ 
+  prices[t] = { val: p.price, change: p.change }; 
+  ok++; 
+}
     await new Promise(res => setTimeout(res, 600));
   }
   dot.className=ok>0?'dot live':'dot err';
@@ -509,11 +519,31 @@ function renderCharts(){
   if(pieInst) pieInst.destroy();
   const data = [...portfolio.map(inv => getCurVal(inv)), liquidita];
   const labels = [...portfolio.map(inv => inv.name), 'Liquidità'];
+  
   pieInst = new Chart(ctx, {
     type: 'doughnut',
     data: { labels, datasets: [{ data, backgroundColor: COLORS }] },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
+
+  // NUOVA LEGENDA CON PERFORMANCE GIORNALIERA
+  const leg = document.getElementById('pie-leg');
+  leg.innerHTML = portfolio.map((inv, i) => {
+    const d = prices[inv.ticker];
+    const changeHtml = d ? 
+      `<span style="color:${d.change >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:bold; font-size:11px; margin-left:8px;">
+        ${d.change >= 0 ? '▲' : '▼'} ${d.change.toFixed(2)}%
+      </span>` : '';
+    
+    return `<div class="leg-item">
+      <div class="leg-label">
+        <span class="leg-dot" style="background:${COLORS[i]}"></span>
+        <span class="leg-name">${inv.name}</span>
+        ${changeHtml}
+      </div>
+      <div class="leg-val">${fe(getCurVal(inv))}</div>
+    </div>`;
+  }).join('') + (liquidita > 0 ? `<div class="leg-item"><div class="leg-label"><span class="leg-dot" style="background:${COLORS[portfolio.length]}"></span><span>Liquidità</span></div><div class="leg-val">${fe(liquidita)}</div></div>` : '');
 }
 
 function renderPac(){
